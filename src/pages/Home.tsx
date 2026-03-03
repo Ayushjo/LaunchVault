@@ -6,7 +6,7 @@ import HowItWorks from "../components/HowItWorks"
 import FeatureCards from "../components/FeatureCards"
 import {
   Zap, TrendingUp, Shield, Users, Clock,
-  ArrowRight, Search, Filter, ChevronRight,
+  ArrowRight, Search, ChevronRight,
   CheckCircle2
 } from "lucide-react";
 
@@ -19,147 +19,9 @@ const statusConfig = {
   released: { label: "Released", color: "text-slate-300", bg: "bg-slate-800 border-slate-700", icon: CheckCircle2 },
 };
 
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="w-full bg-slate-800/50 rounded-full h-1.5 overflow-hidden">
-      <div
-        className="h-full bg-emerald-500 transition-all duration-700 relative"
-        style={{ width: `${Math.min(value, 100)}%` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/30" />
-      </div>
-    </div>
-  );
-}
 
-function FeaturedCampaignCard({ campaign }: { campaign: any }) {
-  const progress = Math.min((campaign.raised / campaign.goal) * 100, 100);
-  const daysLeft = Math.max(
-    0,
-    Math.ceil((new Date(campaign.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-  );
-  const status = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.active;
-  const StatusIcon = status.icon;
 
-  return (
-    <Link to={`/campaign/${campaign.id}`} className="block group">
-      <div className="glass-card rounded-3xl p-8 relative overflow-hidden flex flex-col md:flex-row gap-8 items-center border-emerald-500/20">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none group-hover:bg-emerald-500/20 transition-all duration-700" />
-        
-        <div className="flex-1 space-y-6 z-10 w-full">
-          <div className="flex items-center gap-3">
-            <span className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${status.bg} ${status.color}`}>
-              <StatusIcon className="w-3.5 h-3.5" />
-              {status.label}
-            </span>
-            <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{campaign.category}</span>
-          </div>
 
-          <div>
-            <h3 className="text-white font-black text-3xl mb-3 group-hover:text-emerald-400 transition-colors">
-              {campaign.title}
-            </h3>
-            <p className="text-slate-400 text-base leading-relaxed line-clamp-2">
-              {campaign.description}
-            </p>
-          </div>
-
-          <div className="pt-2">
-            <div className="flex justify-between items-baseline mb-3">
-              <div>
-                <span className="text-white text-3xl font-black">{campaign.raised}</span>
-                <span className="text-slate-500 font-medium ml-1">/ {campaign.goal} ETH</span>
-              </div>
-              <span className="text-emerald-400 font-bold">{Math.round(progress)}% Funded</span>
-            </div>
-            <ProgressBar value={progress} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-6 pt-4 border-t border-white/5">
-            <div className="flex flex-col">
-              <span className="text-slate-500 text-xs font-medium mb-1">Backers</span>
-              <div className="flex items-center gap-1.5 text-slate-200 font-semibold">
-                <Users className="w-4 h-4 text-emerald-500" />
-                {campaign.investors}
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-slate-500 text-xs font-medium mb-1">Time Left</span>
-              <div className="flex items-center gap-1.5 text-slate-200 font-semibold">
-                <Clock className="w-4 h-4 text-emerald-500" />
-                {daysLeft > 0 ? `${daysLeft} days` : "Ended"}
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-slate-500 text-xs font-medium mb-1">Reward Token</span>
-              <div className="flex items-center gap-1 text-emerald-400 font-mono font-bold">
-                <Zap className="w-4 h-4" />
-                {campaign.tokens}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function RegularCampaignCard({ campaign }: { campaign: any }) {
-  const progress = Math.min((campaign.raised / campaign.goal) * 100, 100);
-  const status = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.active;
-
-  return (
-    <Link to={`/campaign/${campaign.id}`} className="block h-full">
-      <div className="glass-card rounded-2xl p-6 h-full flex flex-col group relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-slate-800/50 rounded-full blur-[40px] pointer-events-none group-hover:bg-emerald-900/30 transition-all duration-500" />
-        
-        <div className="flex items-center justify-between mb-4 relative z-10">
-          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${status.bg} ${status.color}`}>
-            {status.label}
-          </span>
-          <span className="text-xs text-slate-500 font-medium">{campaign.category}</span>
-        </div>
-
-        <h3 className="text-white font-bold text-lg mb-2 leading-snug group-hover:text-emerald-400 transition-colors line-clamp-2 relative z-10">
-          {campaign.title}
-        </h3>
-
-        <p className="text-slate-400 text-sm leading-relaxed line-clamp-2 mb-6 flex-1 relative z-10">
-          {campaign.description}
-        </p>
-
-        <div className="mb-4 relative z-10">
-          <div className="flex justify-between items-baseline mb-2">
-            <span className="text-white text-sm font-semibold">
-              {campaign.raised} <span className="text-slate-500 font-normal">/ {campaign.goal} ETH</span>
-            </span>
-            <span className="text-emerald-500 text-xs font-bold">{Math.round(progress)}%</span>
-          </div>
-          <ProgressBar value={progress} />
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function StatCard({ icon: Icon, value, label, delay }: { icon: any, value: any, label: string, delay: number }) {
-  return (
-    <div className={`glass-card rounded-2xl p-6 flex items-center gap-5 animate-fade-up-delay-${delay}`}>
-      <div className="relative shrink-0">
-        <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
-        <div className="relative bg-emerald-500/10 border border-emerald-500/20 p-3.5 rounded-xl">
-          <Icon className="w-6 h-6 text-emerald-500" />
-        </div>
-      </div>
-      <div>
-        <div className="text-3xl font-black text-white tracking-tight">
-          {value}
-        </div>
-        <div className="text-slate-400 text-sm font-medium mt-0.5">{label}</div>
-      </div>
-    </div>
-  );
-}
 
 export default function Home() {
   const [search, setSearch] = useState("");
