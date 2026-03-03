@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { WalletProvider } from "./context/WalletContext";
-import Navbar from "./components/layout/Navbar.jsx"
+import { WalletProvider } from "./context/WalletContext.js";
+import Navbar from "./components/layout/Navbar.js"
 import Home from "./pages/Home";
-import CampaignDetails from "./pages/CampaignDetails";
-import CreateCampaign from "./pages/CreateCampaign";
-import Dashboard from "./pages/Dashboard"
-import NotFound from "./pages/NotFound"
-import WalletModal from "./components/WalletModal";
+import CampaignDetails from "./pages/CampaignDetails.js";
+import CreateCampaign from "./pages/CreateCampaign.js";
+import Dashboard from "./pages/Dashboard.js"
+import NotFound from "./pages/NotFound.js"
+import WalletModal from "./components/WalletModal.js";
 
 export default function App() {
   return (

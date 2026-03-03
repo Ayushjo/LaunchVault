@@ -1,6 +1,49 @@
 import { ShieldCheck, Coins, BarChart3, Repeat2, Globe, Zap } from "lucide-react";
 
+interface TokenItem {
+  label: string;
+  pct: number;
+  color: string;
+}
+
+interface TxItem {
+  hash: string;
+  label: string;
+  time: string;
+}
+
+interface FlowItem {
+  label: string;
+  icon: string;
+  color: string;
+}
+
 export default function FeatureCards() {
+  const tokenItems: TokenItem[] = [
+    { label: "Investor A", pct: 40, color: "bg-blue-400" },
+    { label: "Investor B", pct: 35, color: "bg-blue-500" },
+    { label: "Others", pct: 25, color: "bg-blue-800" },
+  ];
+
+  const txItems: TxItem[] = [
+    { hash: "0xf4a2...b391", label: "Fund Lock", time: "2m ago" },
+    { hash: "0x9c12...44ef", label: "Vote Cast", time: "5m ago" },
+    { hash: "0x3d87...a12c", label: "Milestone", time: "1h ago" },
+  ];
+
+  const flowItems: FlowItem[] = [
+    { label: "Goal Not Reached", icon: "✗", color: "text-red-400 bg-red-500/10 border-red-500/20" },
+    { label: "Contract Unlocks", icon: "⟳", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+    { label: "ETH Returned", icon: "✓", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+  ];
+
+  const countries: string[] = [
+    "🇺🇸 USA", "🇮🇳 India", "🇩🇪 Germany", "🇧🇷 Brazil",
+    "🇯🇵 Japan", "🇳🇬 Nigeria", "🇸🇬 Singapore", "🌍 +190",
+  ];
+
+  const escrowLabels: string[] = ["Investor ✓", "Contract ✓", "Founder ✓"];
+
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
       {/* Header */}
@@ -53,7 +96,7 @@ export default function FeatureCards() {
 
           {/* Mini contract visual */}
           <div className="absolute bottom-6 right-6 flex flex-col gap-1.5 opacity-40 group-hover:opacity-70 transition-opacity">
-            {["Investor ✓", "Contract ✓", "Founder ✓"].map((t, i) => (
+            {escrowLabels.map((t: string, i: number) => (
               <div key={i} className="flex items-center gap-2 bg-slate-800/80 px-3 py-1 rounded-lg">
                 <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                 <span className="text-xs text-slate-300 font-mono">{t}</span>
@@ -88,11 +131,7 @@ export default function FeatureCards() {
 
           {/* Token distribution visual */}
           <div className="mt-6 space-y-2">
-            {[
-              { label: "Investor A", pct: 40, color: "bg-blue-400" },
-              { label: "Investor B", pct: 35, color: "bg-blue-500" },
-              { label: "Others", pct: 25, color: "bg-blue-800" },
-            ].map((item, i) => (
+            {tokenItems.map((item: TokenItem, i: number) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="text-xs text-slate-500 w-16 shrink-0">{item.label}</span>
                 <div className="flex-1 bg-slate-800 rounded-full h-1.5">
@@ -120,11 +159,7 @@ export default function FeatureCards() {
 
           {/* Mini block explorer visual */}
           <div className="mt-6 space-y-2">
-            {[
-              { hash: "0xf4a2...b391", label: "Fund Lock", time: "2m ago" },
-              { hash: "0x9c12...44ef", label: "Vote Cast", time: "5m ago" },
-              { hash: "0x3d87...a12c", label: "Milestone", time: "1h ago" },
-            ].map((tx, i) => (
+            {txItems.map((tx: TxItem, i: number) => (
               <div key={i} className="flex items-center justify-between bg-slate-800/40 rounded-xl px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-violet-400 rounded-full shrink-0" />
@@ -157,11 +192,7 @@ export default function FeatureCards() {
 
             {/* Refund flow visual */}
             <div className="flex flex-col justify-center gap-3 md:w-52 shrink-0">
-              {[
-                { label: "Goal Not Reached", icon: "✗", color: "text-red-400 bg-red-500/10 border-red-500/20" },
-                { label: "Contract Unlocks", icon: "⟳", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-                { label: "ETH Returned", icon: "✓", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-              ].map((item, i) => (
+              {flowItems.map((item: FlowItem, i: number) => (
                 <div key={i}>
                   <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${item.color}`}>
                     <span className="text-sm font-black">{item.icon}</span>
@@ -185,13 +216,13 @@ export default function FeatureCards() {
           {/* World grid decorative */}
           <div className="absolute right-0 top-0 bottom-0 w-48 opacity-5 group-hover:opacity-10 transition-opacity overflow-hidden pointer-events-none">
             <svg viewBox="0 0 200 200" className="w-full h-full">
-              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              {[0, 1, 2, 3, 4, 5, 6].map((i: number) => (
                 <line key={`h${i}`} x1="0" y1={i * 33} x2="200" y2={i * 33} stroke="#f43f5e" strokeWidth="0.5" />
               ))}
-              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+              {[0, 1, 2, 3, 4, 5, 6].map((i: number) => (
                 <line key={`v${i}`} x1={i * 33} y1="0" x2={i * 33} y2="200" stroke="#f43f5e" strokeWidth="0.5" />
               ))}
-              {[[40, 60], [80, 40], [120, 80], [160, 50], [100, 120], [60, 140]].map(([x, y], i) => (
+              {([[40, 60], [80, 40], [120, 80], [160, 50], [100, 120], [60, 140]] as [number, number][]).map(([x, y], i: number) => (
                 <circle key={i} cx={x} cy={y} r="4" fill="#f43f5e" opacity="0.8" />
               ))}
             </svg>
@@ -210,7 +241,7 @@ export default function FeatureCards() {
 
             {/* Country pills */}
             <div className="flex flex-wrap gap-2 md:max-w-xs">
-              {["🇺🇸 USA", "🇮🇳 India", "🇩🇪 Germany", "🇧🇷 Brazil", "🇯🇵 Japan", "🇳🇬 Nigeria", "🇸🇬 Singapore", "🌍 +190"].map((c, i) => (
+              {countries.map((c: string, i: number) => (
                 <span key={i} className="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-800/60 border border-slate-700 text-slate-300">
                   {c}
                 </span>

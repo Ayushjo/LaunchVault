@@ -1,14 +1,13 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, Zap, Search } from "lucide-react";
+import {type JSX} from "react"
 
-export default function NotFound() {
+export default function NotFound(): JSX.Element {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative">
-      {/* Background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative z-10 text-center max-w-lg">
-        {/* 404 big number */}
         <div className="relative inline-block mb-8">
           <span className="text-[10rem] font-black text-slate-800 leading-none select-none">
             404
@@ -20,12 +19,9 @@ export default function NotFound() {
           </div>
         </div>
 
-        <h1 className="text-3xl font-black text-white mb-3 tracking-tight">
-          Page Not Found
-        </h1>
+        <h1 className="text-3xl font-black text-white mb-3 tracking-tight">Page Not Found</h1>
         <p className="text-slate-400 leading-relaxed mb-8 max-w-sm mx-auto">
-          This page doesn't exist or has been moved. Double-check the URL or
-          head back to explore active campaigns.
+          This page doesn't exist or has been moved. Double-check the URL or head back to explore active campaigns.
         </p>
 
         <div className="flex items-center justify-center gap-3 flex-wrap">

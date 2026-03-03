@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { campaigns } from "../data/mockData";
-import BlockchainBackground from "../components/BlockchainBackground";
-import HowItWorks from "../components/HowItWorks";
-import FeatureCards from "../components/FeatureCards";
+import BlockchainBackground from "../components/BlockchainBackground"
+import HowItWorks from "../components/HowItWorks"
+import FeatureCards from "../components/FeatureCards"
 import {
   Zap, TrendingUp, Shield, Users, Clock,
   ArrowRight, Search, Filter, ChevronRight,
@@ -379,7 +379,7 @@ export default function Home() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 uppercase tracking-wider">
                       <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full pulse-dot" />
-                      {statusConfig[featuredCampaign.status]?.label || "Live"}
+                      {statusConfig[featuredCampaign.status as keyof typeof statusConfig]?.label || "Live"}
                     </span>
                     <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">
                       {featuredCampaign.category}
@@ -430,7 +430,7 @@ export default function Home() {
                   </div>
                   <div className="glass-card rounded-2xl p-4 text-center flex-1 lg:flex-none">
                     <div className="text-2xl font-black text-white">
-                      {Math.max(0, Math.ceil((new Date(featuredCampaign.deadline) - new Date()) / (1000 * 60 * 60 * 24)))}d
+                      {Math.max(0, Math.ceil((new Date(featuredCampaign.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))}d
                     </div>
                     <div className="text-xs text-slate-500 mt-1 font-medium">Remaining</div>
                   </div>
@@ -453,7 +453,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
               {regularCampaigns.slice(0, 2).map((c) => {
                 const progress = Math.min((c.raised / c.goal) * 100, 100);
-                const status = statusConfig[c.status] || statusConfig.active;
+                const status = statusConfig[c.status as keyof typeof statusConfig] || statusConfig.active;
                 const borderAccent = {
                   active: "border-l-emerald-500",
                   voting: "border-l-amber-500",
@@ -517,7 +517,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {regularCampaigns.slice(2).map((c) => {
                 const progress = Math.min((c.raised / c.goal) * 100, 100);
-                const status = statusConfig[c.status] || statusConfig.active;
+                const status = statusConfig[c.status as keyof typeof statusConfig] || statusConfig.active;
                 const borderAccent = {
                   active: "border-l-emerald-500",
                   voting: "border-l-amber-500",

@@ -1,12 +1,14 @@
 import { useEffect, useRef } from "react";
 
 export default function BlockchainBackground() {
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    let animationId;
+    if (!ctx) return;
+    let animationId: number;
 
     const resize = () => {
       canvas.width = canvas.offsetWidth;

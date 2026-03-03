@@ -1,31 +1,37 @@
 import { Link, useLocation } from "react-router-dom";
 import { useWallet } from "../../context/WalletContext";
 import { Zap, Menu, X, Wifi, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useState, type JSX } from "react";
 
-const navLinks = [
-  { label: "Explore", path: "/" },
-  { label: "Create Campaign", path: "/create" },
-  { label: "Dashboard", path: "/dashboard" },
+interface NavLink {
+  label: string;
+  path: string;
+}
+
+const navLinks: NavLink[] = [
+  { label: "Explore",         path: "/"          },
+  { label: "Create Campaign", path: "/create"    },
+  { label: "Dashboard",       path: "/dashboard" },
 ];
 
-const networkColors = {
-  Ethereum: "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  Polygon: "text-violet-400 bg-violet-500/10 border-violet-500/20",
-  Mumbai: "text-violet-400 bg-violet-500/10 border-violet-500/20",
-  Sepolia: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+const networkColors: Record<string, string> = {
+  Ethereum:  "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  Polygon:   "text-violet-400 bg-violet-500/10 border-violet-500/20",
+  Mumbai:    "text-violet-400 bg-violet-500/10 border-violet-500/20",
+  Sepolia:   "text-amber-400 bg-amber-500/10 border-amber-500/20",
   Localhost: "text-slate-400 bg-slate-500/10 border-slate-500/20",
 };
 
-export default function Navbar() {
-  const { wallet, connecting, connectWallet, disconnectWallet, shortAddress, network } =
-    useWallet();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
+export default function Navbar(): JSX.Element {
+  const { wallet, connecting, connectWallet, disconnectWallet, shortAddress, network } = useWallet();
+  const [menuOpen, setMenuOpen]       = useState<boolean>(false);
+  const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const location = useLocation();
 
-  const isActive = (path) => location.pathname === path;
-  const networkStyle = network ? networkColors[network] || "text-slate-400 bg-slate-500/10 border-slate-500/20" : "";
+  const isActive = (path: string): boolean => location.pathname === path;
+  const networkStyle: string = network
+    ? networkColors[network] ?? "text-slate-400 bg-slate-500/10 border-slate-500/20"
+    : "";
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
@@ -44,7 +50,7 @@ export default function Navbar() {
 
           {/* Desktop Nav Links */}
           <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {navLinks.map((link: NavLink) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -63,7 +69,6 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {wallet ? (
               <div className="flex items-center gap-2">
-                {/* Network Badge */}
                 {network && (
                   <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${networkStyle}`}>
                     <Wifi className="w-3 h-3" />
@@ -71,27 +76,22 @@ export default function Navbar() {
                   </div>
                 )}
 
-                {/* Wallet Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setShowDropdown((p) => !p)}
                     className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
                   >
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                    <span className="text-slate-300 text-sm font-mono font-semibold">
-                      {shortAddress}
-                    </span>
+                    <span className="text-slate-300 text-sm font-mono font-semibold">{shortAddress}</span>
                   </button>
 
                   {showDropdown && (
                     <div className="absolute right-0 top-12 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50">
-                      {/* Wallet Info */}
                       <div className="p-4 border-b border-slate-800">
                         <p className="text-xs text-slate-500 font-medium mb-1 uppercase tracking-wider">Connected Wallet</p>
                         <p className="text-white font-mono text-sm font-bold break-all">{wallet}</p>
                       </div>
 
-                      {/* Network Info */}
                       {network && (
                         <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
                           <span className="text-xs text-slate-500">Network</span>
@@ -101,7 +101,6 @@ export default function Navbar() {
                         </div>
                       )}
 
-                      {/* Warning if not on Polygon */}
                       {network && network !== "Polygon" && network !== "Mumbai" && (
                         <div className="px-4 py-3 border-b border-slate-800 flex items-start gap-2">
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
@@ -111,7 +110,6 @@ export default function Navbar() {
                         </div>
                       )}
 
-                      {/* Actions */}
                       <div className="p-2">
                         <Link
                           to="/dashboard"
@@ -156,7 +154,7 @@ export default function Navbar() {
       {/* Mobile Menu */}
       {menuOpen && (
         <div className="md:hidden bg-slate-950 border-t border-white/5 px-4 py-4 flex flex-col gap-2">
-          {navLinks.map((link) => (
+          {navLinks.map((link: NavLink) => (
             <Link
               key={link.path}
               to={link.path}
@@ -203,7 +201,6 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Close dropdown on outside click */}
       {showDropdown && (
         <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
       )}

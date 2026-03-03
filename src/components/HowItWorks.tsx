@@ -1,6 +1,25 @@
-import { Wallet, Lock, Vote, Banknote } from "lucide-react";
+import { Wallet, Lock, Vote, Banknote,  } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const steps = [
+interface Step {
+  icon: LucideIcon;
+  step: string;
+  title: string;
+  description: string;
+  color: keyof typeof colorMap;
+  align: "left" | "right";
+}
+
+interface ColorConfig {
+  bg: string;
+  border: string;
+  icon: string;
+  glow: string;
+  step: string;
+  arrow: string;
+}
+
+const steps: Step[] = [
   {
     icon: Wallet,
     step: "01",
@@ -68,13 +87,14 @@ const colorMap = {
     step: "text-amber-500/20",
     arrow: "#f59e0b",
   },
-};
+} satisfies Record<string, ColorConfig>;
 
-// SVG arrows between steps
-// Each arrow goes from current step position to next step position
-// left -> right = curves down-right
-// right -> left = curves down-left
-function ArrowConnector({ fromAlign, color }) {
+interface ArrowConnectorProps {
+  fromAlign: "left" | "right";
+  color: string;
+}
+
+function ArrowConnector({ fromAlign, color }: ArrowConnectorProps) {
   const isLeftToRight = fromAlign === "left";
 
   return (
@@ -86,7 +106,6 @@ function ArrowConnector({ fromAlign, color }) {
         xmlns="http://www.w3.org/2000/svg"
       >
         {isLeftToRight ? (
-          // Left to right: starts left-center, curves to right-center
           <>
             <path
               d="M 60 10 C 60 50, 340 30, 340 70"
@@ -95,7 +114,6 @@ function ArrowConnector({ fromAlign, color }) {
               strokeDasharray="6 4"
               opacity="0.5"
             />
-            {/* Arrowhead at end */}
             <polygon
               points="334,62 346,74 322,74"
               fill={color}
@@ -103,7 +121,6 @@ function ArrowConnector({ fromAlign, color }) {
             />
           </>
         ) : (
-          // Right to left: starts right-center, curves to left-center
           <>
             <path
               d="M 340 10 C 340 50, 60 30, 60 70"
@@ -112,7 +129,6 @@ function ArrowConnector({ fromAlign, color }) {
               strokeDasharray="6 4"
               opacity="0.5"
             />
-            {/* Arrowhead at end */}
             <polygon
               points="54,62 66,74 42,74"
               fill={color}
@@ -125,7 +141,12 @@ function ArrowConnector({ fromAlign, color }) {
   );
 }
 
-function StepCard({ step, index }) {
+interface StepCardProps {
+  step: Step;
+  index: number;
+}
+
+function StepCard({ step }: StepCardProps) {
   const c = colorMap[step.color];
   const Icon = step.icon;
   const isLeft = step.align === "left";
@@ -133,19 +154,26 @@ function StepCard({ step, index }) {
   return (
     <div className={`flex w-full ${isLeft ? "justify-start" : "justify-end"}`}>
       <div className="w-full max-w-sm group">
-        {/* Card */}
-        <div className={`glass-card rounded-3xl p-7 relative overflow-hidden border ${c.border} hover:scale-105 transition-all duration-300`}>
+        <div
+          className={`glass-card rounded-3xl p-7 relative overflow-hidden border ${c.border} hover:scale-105 transition-all duration-300`}
+        >
           {/* Big step number background */}
-          <div className={`absolute -top-2 -right-2 text-8xl font-black pointer-events-none select-none leading-none ${c.step}`}>
+          <div
+            className={`absolute -top-2 -right-2 text-8xl font-black pointer-events-none select-none leading-none ${c.step}`}
+          >
             {step.step}
           </div>
 
           {/* Glow blob */}
-          <div className={`absolute -bottom-6 -left-6 w-32 h-32 ${c.glow} rounded-full blur-3xl opacity-30 pointer-events-none`} />
+          <div
+            className={`absolute -bottom-6 -left-6 w-32 h-32 ${c.glow} rounded-full blur-3xl opacity-30 pointer-events-none`}
+          />
 
           <div className="relative z-10 flex items-start gap-5">
             {/* Icon */}
-            <div className={`shrink-0 ${c.bg} border ${c.border} p-3.5 rounded-2xl group-hover:scale-110 transition-transform duration-300`}>
+            <div
+              className={`shrink-0 ${c.bg} border ${c.border} p-3.5 rounded-2xl group-hover:scale-110 transition-transform duration-300`}
+            >
               <Icon className={`w-6 h-6 ${c.icon}`} />
             </div>
 
@@ -190,7 +218,6 @@ export default function HowItWorks() {
         {steps.map((step, i) => (
           <div key={i}>
             <StepCard step={step} index={i} />
-            {/* Arrow between steps */}
             {i < steps.length - 1 && (
               <ArrowConnector
                 fromAlign={step.align}

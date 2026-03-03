@@ -1,29 +1,78 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useWallet } from "../context/WalletContext";
 import { campaigns } from "../data/mockData";
 import {
   ArrowLeft, Zap, Users, Clock, Shield, TrendingUp,
-  CheckCircle2, XCircle, ThumbsUp, ThumbsDown, X,
+  CheckCircle2, ThumbsUp, ThumbsDown, X,
   Copy, ExternalLink, AlertCircle
 } from "lucide-react";
 
-const statusConfig = {
-  active: { label: "Live", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
-  voting: { label: "Voting Open", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-  funded: { label: "Funded", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-  released: { label: "Completed", color: "text-slate-300", bg: "bg-slate-800 border-slate-700" },
+interface Campaign {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  status: "active" | "voting" | "funded" | "released";
+  raised: number;
+  goal: number;
+  investors: number;
+  deadline: string;
+  tokens: string;
+  founder: string;
+  milestone: {
+    description: string;
+    amount: number;
+    voteYes: number;
+    voteNo: number;
+    votingActive: boolean;
+    released: boolean;
+  };
+}
+
+interface StatusConfigEntry {
+  label: string;
+  color: string;
+  bg: string;
+}
+
+interface Investor {
+  address: string;
+  amount: number;
+  tokens: number;
+  date: string;
+}
+
+interface ProgressBarProps {
+  value: number;
+}
+
+interface VoteBarProps {
+  yes: number;
+  no: number;
+}
+
+interface InvestModalProps {
+  campaign: Campaign;
+  onClose: () => void;
+}
+
+const statusConfig: Record<string, StatusConfigEntry> = {
+  active:   { label: "Live",         color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+  voting:   { label: "Voting Open",  color: "text-amber-400",   bg: "bg-amber-500/10 border-amber-500/20"   },
+  funded:   { label: "Funded",       color: "text-blue-400",    bg: "bg-blue-500/10 border-blue-500/20"     },
+  released: { label: "Completed",    color: "text-slate-300",   bg: "bg-slate-800 border-slate-700"         },
 };
 
-const mockInvestors = [
-  { address: "0xA1b2...C3d4", amount: 10, tokens: 1000, date: "2025-03-01" },
-  { address: "0xE5f6...G7h8", amount: 7.5, tokens: 750, date: "2025-03-03" },
-  { address: "0xI9j0...K1l2", amount: 5, tokens: 500, date: "2025-03-05" },
-  { address: "0xM3n4...O5p6", amount: 3, tokens: 300, date: "2025-03-07" },
-  { address: "0xQ7r8...S9t0", amount: 2, tokens: 200, date: "2025-03-09" },
+const mockInvestors: Investor[] = [
+  { address: "0xA1b2...C3d4", amount: 10,  tokens: 1000, date: "2025-03-01" },
+  { address: "0xE5f6...G7h8", amount: 7.5, tokens: 750,  date: "2025-03-03" },
+  { address: "0xI9j0...K1l2", amount: 5,   tokens: 500,  date: "2025-03-05" },
+  { address: "0xM3n4...O5p6", amount: 3,   tokens: 300,  date: "2025-03-07" },
+  { address: "0xQ7r8...S9t0", amount: 2,   tokens: 200,  date: "2025-03-09" },
 ];
 
-function ProgressBar({ value }) {
+function ProgressBar({ value }: ProgressBarProps) {
   return (
     <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
       <div
@@ -36,16 +85,16 @@ function ProgressBar({ value }) {
   );
 }
 
-function VoteBar({ yes, no }) {
+function VoteBar({ yes, no }: VoteBarProps) {
   const total = yes + no;
   const yesPercent = total > 0 ? Math.round((yes / total) * 100) : 0;
-  const noPercent = total > 0 ? Math.round((no / total) * 100) : 0;
+  const noPercent  = total > 0 ? Math.round((no  / total) * 100) : 0;
 
   return (
     <div className="space-y-2">
       <div className="flex gap-1 h-2 rounded-full overflow-hidden">
-        <div className="bg-emerald-500 transition-all" style={{ width: `${yesPercent}%` }} />
-        <div className="bg-red-500/70 transition-all" style={{ width: `${noPercent}%` }} />
+        <div className="bg-emerald-500 transition-all"    style={{ width: `${yesPercent}%` }} />
+        <div className="bg-red-500/70 transition-all"     style={{ width: `${noPercent}%`  }} />
         <div className="flex-1 bg-slate-800" />
       </div>
       <div className="flex justify-between text-xs text-slate-400">
@@ -56,18 +105,15 @@ function VoteBar({ yes, no }) {
   );
 }
 
-function InvestModal({ campaign, onClose }) {
-  const [amount, setAmount] = useState("");
+function InvestModal({ campaign, onClose }: InvestModalProps) {
+  const [amount, setAmount] = useState<string>("");
   const estimatedTokens = amount ? Math.floor((parseFloat(amount) / campaign.goal) * 10000) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-md shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors"
-        >
+        <button onClick={onClose} className="absolute top-5 right-5 text-slate-500 hover:text-white transition-colors">
           <X className="w-5 h-5" />
         </button>
 
@@ -86,13 +132,13 @@ function InvestModal({ campaign, onClose }) {
                 type="number"
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)}
                 className="w-full bg-slate-800/50 border border-slate-700 text-white text-lg font-bold placeholder-slate-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">ETH</span>
             </div>
             <div className="flex gap-2 mt-2">
-              {["0.1", "0.5", "1", "5"].map((v) => (
+              {["0.1", "0.5", "1", "5"].map((v: string) => (
                 <button
                   key={v}
                   onClick={() => setAmount(v)}
@@ -139,11 +185,11 @@ function InvestModal({ campaign, onClose }) {
   );
 }
 
-export default function CampaignDetail() {
-  const { id } = useParams();
-  const campaign = campaigns.find((c) => c.id === parseInt(id));
-  const [showModal, setShowModal] = useState(false);
-  const [userVote, setUserVote] = useState(null);
+export default function CampaignDetails() {
+  const { id } = useParams<{ id: string }>();
+  const campaign = campaigns.find(c => c.id === parseInt(id ?? "")) as unknown as Campaign | undefined;
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [userVote, setUserVote] = useState<"yes" | "no" | null>(null);
   const { wallet, connectWallet } = useWallet();
 
   if (!campaign) {
@@ -164,24 +210,19 @@ export default function CampaignDetail() {
   const progress = Math.min((campaign.raised / campaign.goal) * 100, 100);
   const daysLeft = Math.max(
     0,
-    Math.ceil((new Date(campaign.deadline) - new Date()) / (1000 * 60 * 60 * 24))
+    Math.ceil((new Date(campaign.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
   );
-  const status = statusConfig[campaign.status] || statusConfig.active;
+  const status = statusConfig[campaign.status] ?? statusConfig.active;
   const { milestone } = campaign;
 
   return (
     <div className="min-h-screen pb-24">
       {showModal && <InvestModal campaign={campaign} onClose={() => setShowModal(false)} />}
 
-      {/* Top glow */}
       <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 relative z-10">
-        {/* Back */}
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium mb-8 group"
-        >
+        <Link to="/" className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium mb-8 group">
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Campaigns
         </Link>
@@ -198,14 +239,9 @@ export default function CampaignDetail() {
                 <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">{campaign.category}</span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-black text-white mb-4 leading-tight">
-                {campaign.title}
-              </h1>
-              <p className="text-slate-400 leading-relaxed text-base mb-6">
-                {campaign.description}
-              </p>
+              <h1 className="text-3xl sm:text-4xl font-black text-white mb-4 leading-tight">{campaign.title}</h1>
+              <p className="text-slate-400 leading-relaxed text-base mb-6">{campaign.description}</p>
 
-              {/* Stats row */}
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/5">
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1.5 text-emerald-500 mb-1">
@@ -256,39 +292,38 @@ export default function CampaignDetail() {
                 </div>
               </div>
 
-              {/* Vote section */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Voting Status</h3>
                 <VoteBar yes={milestone.voteYes} no={milestone.voteNo} />
 
                 {milestone.votingActive && !userVote && (
-  <div className="pt-2">
-    <p className="text-xs text-slate-500 mb-3">Cast your vote as an investor</p>
-    {wallet ? (
-      <div className="flex gap-3">
-        <button
-          onClick={() => setUserVote("yes")}
-          className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-3 rounded-xl transition-all active:scale-95"
-        >
-          <ThumbsUp className="w-4 h-4" /> Vote Yes
-        </button>
-        <button
-          onClick={() => setUserVote("no")}
-          className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-3 rounded-xl transition-all active:scale-95"
-        >
-          <ThumbsDown className="w-4 h-4" /> Vote No
-        </button>
-      </div>
-    ) : (
-      <button
-        onClick={connectWallet}
-        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 rounded-xl transition-all active:scale-95"
-      >
-        <Zap className="w-4 h-4 text-emerald-400" /> Connect Wallet to Vote
-      </button>
-    )}
-  </div>
-)}
+                  <div className="pt-2">
+                    <p className="text-xs text-slate-500 mb-3">Cast your vote as an investor</p>
+                    {wallet ? (
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setUserVote("yes")}
+                          className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-3 rounded-xl transition-all active:scale-95"
+                        >
+                          <ThumbsUp className="w-4 h-4" /> Vote Yes
+                        </button>
+                        <button
+                          onClick={() => setUserVote("no")}
+                          className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-3 rounded-xl transition-all active:scale-95"
+                        >
+                          <ThumbsDown className="w-4 h-4" /> Vote No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={connectWallet}
+                        className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold py-3 rounded-xl transition-all active:scale-95"
+                      >
+                        <Zap className="w-4 h-4 text-emerald-400" /> Connect Wallet to Vote
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 {userVote && (
                   <div className={`flex items-center gap-2 p-4 rounded-xl border ${
@@ -325,7 +360,7 @@ export default function CampaignDetail() {
               </div>
 
               <div className="space-y-3">
-                {mockInvestors.map((inv, i) => (
+                {mockInvestors.map((inv: Investor, i: number) => (
                   <div
                     key={i}
                     className="flex items-center justify-between bg-slate-800/30 hover:bg-slate-800/50 rounded-xl px-4 py-3 transition-colors"
@@ -356,7 +391,6 @@ export default function CampaignDetail() {
 
           {/* RIGHT COLUMN — Sticky Sidebar */}
           <div className="space-y-5">
-            {/* Funding Card */}
             <div className="glass-card rounded-3xl p-6 sticky top-24">
               <div className="mb-5">
                 <div className="flex justify-between items-baseline mb-1">
@@ -379,22 +413,22 @@ export default function CampaignDetail() {
               </div>
 
               {wallet ? (
-  <button
-    onClick={() => setShowModal(true)}
-    disabled={daysLeft === 0 || campaign.status === "released"}
-    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 shadow-lg shadow-emerald-900/40 mb-3"
-  >
-    Invest Now
-  </button>
-) : (
-  <button
-    onClick={connectWallet}
-    className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 mb-3 flex items-center justify-center gap-2"
-  >
-    <Zap className="w-4 h-4 text-emerald-400" />
-    Connect Wallet to Invest
-  </button>
-)}
+                <button
+                  onClick={() => setShowModal(true)}
+                  disabled={daysLeft === 0 || campaign.status === "released"}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 shadow-lg shadow-emerald-900/40 mb-3"
+                >
+                  Invest Now
+                </button>
+              ) : (
+                <button
+                  onClick={connectWallet}
+                  className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 mb-3 flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  Connect Wallet to Invest
+                </button>
+              )}
 
               <div className="flex items-center justify-center gap-1.5 text-slate-500 text-xs">
                 <Shield className="w-3.5 h-3.5" />
