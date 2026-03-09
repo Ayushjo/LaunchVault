@@ -9,35 +9,54 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { label: "Explore",         path: "/"          },
-  { label: "Create Campaign", path: "/create"    },
-  { label: "Dashboard",       path: "/dashboard" },
+  { label: "Explore", path: "/" },
+  { label: "Create Campaign", path: "/create" },
+  { label: "Dashboard", path: "/dashboard" },
 ];
 
 const networkColors: Record<string, string> = {
-  Ethereum:  "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  Polygon:   "text-violet-400 bg-violet-500/10 border-violet-500/20",
-  Mumbai:    "text-violet-400 bg-violet-500/10 border-violet-500/20",
-  Sepolia:   "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  Ethereum: "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  Polygon: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+  Mumbai: "text-violet-400 bg-violet-500/10 border-violet-500/20",
+  Sepolia: "text-amber-400 bg-amber-500/10 border-amber-500/20",
   Localhost: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+  "LaunchVault Testnet":
+    "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
 };
 
+const SUPPORTED_NETWORKS = [
+  "Polygon",
+  "Mumbai",
+  "LaunchVault Testnet",
+  "Localhost",
+];
+
 export default function Navbar(): JSX.Element {
-  const { wallet, connecting, connectWallet, disconnectWallet, shortAddress, network } = useWallet();
-  const [menuOpen, setMenuOpen]       = useState<boolean>(false);
+  const {
+    wallet,
+    connecting,
+    connectWallet,
+    disconnectWallet,
+    shortAddress,
+    network,
+  } = useWallet();
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const location = useLocation();
 
   const isActive = (path: string): boolean => location.pathname === path;
   const networkStyle: string = network
-    ? networkColors[network] ?? "text-slate-400 bg-slate-500/10 border-slate-500/20"
+    ? (networkColors[network] ??
+      "text-slate-400 bg-slate-500/10 border-slate-500/20")
     : "";
+  const isWrongNetwork = network
+    ? !SUPPORTED_NETWORKS.includes(network)
+    : false;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <div className="bg-emerald-600 p-1.5 rounded-lg">
@@ -69,47 +88,66 @@ export default function Navbar(): JSX.Element {
           <div className="hidden md:flex items-center gap-3">
             {wallet ? (
               <div className="flex items-center gap-2">
+                {/* Network Badge */}
                 {network && (
-                  <div className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${networkStyle}`}>
+                  <div
+                    className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${networkStyle}`}
+                  >
                     <Wifi className="w-3 h-3" />
                     {network}
                   </div>
                 )}
 
+                {/* Wallet Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setShowDropdown((p) => !p)}
                     className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl transition-all"
                   >
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                    <span className="text-slate-300 text-sm font-mono font-semibold">{shortAddress}</span>
+                    <span className="text-slate-300 text-sm font-mono font-semibold">
+                      {shortAddress}
+                    </span>
                   </button>
 
                   {showDropdown && (
                     <div className="absolute right-0 top-12 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50">
+                      {/* Address */}
                       <div className="p-4 border-b border-slate-800">
-                        <p className="text-xs text-slate-500 font-medium mb-1 uppercase tracking-wider">Connected Wallet</p>
-                        <p className="text-white font-mono text-sm font-bold break-all">{wallet}</p>
+                        <p className="text-xs text-slate-500 font-medium mb-1 uppercase tracking-wider">
+                          Connected Wallet
+                        </p>
+                        <p className="text-white font-mono text-sm font-bold break-all">
+                          {wallet}
+                        </p>
                       </div>
 
+                      {/* Network */}
                       {network && (
                         <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
-                          <span className="text-xs text-slate-500">Network</span>
-                          <span className={`text-xs font-bold px-2 py-1 rounded-full border ${networkStyle}`}>
+                          <span className="text-xs text-slate-500">
+                            Network
+                          </span>
+                          <span
+                            className={`text-xs font-bold px-2 py-1 rounded-full border ${networkStyle}`}
+                          >
                             {network}
                           </span>
                         </div>
                       )}
 
-                      {network && network !== "Polygon" && network !== "Mumbai" && (
+                      {/* Wrong network warning */}
+                      {isWrongNetwork && (
                         <div className="px-4 py-3 border-b border-slate-800 flex items-start gap-2">
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                           <p className="text-xs text-amber-400 leading-relaxed">
-                            Switch to Polygon or Mumbai testnet for full functionality.
+                            Switch to LaunchVault Testnet for full
+                            functionality.
                           </p>
                         </div>
                       )}
 
+                      {/* Actions */}
                       <div className="p-2">
                         <Link
                           to="/dashboard"
@@ -119,7 +157,10 @@ export default function Navbar(): JSX.Element {
                           My Dashboard
                         </Link>
                         <button
-                          onClick={() => { disconnectWallet(); setShowDropdown(false); }}
+                          onClick={() => {
+                            disconnectWallet();
+                            setShowDropdown(false);
+                          }}
                           className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors font-medium"
                         >
                           Disconnect Wallet
@@ -146,7 +187,11 @@ export default function Navbar(): JSX.Element {
             className="md:hidden text-slate-400 hover:text-white transition-colors"
             onClick={() => setMenuOpen(!menuOpen)}
           >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {menuOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>
@@ -174,15 +219,33 @@ export default function Navbar(): JSX.Element {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-800/50 rounded-xl">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                  <span className="text-slate-300 text-sm font-mono">{shortAddress}</span>
+                  <span className="text-slate-300 text-sm font-mono">
+                    {shortAddress}
+                  </span>
                   {network && (
-                    <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${networkStyle}`}>
+                    <span
+                      className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${networkStyle}`}
+                    >
                       {network}
                     </span>
                   )}
                 </div>
+
+                {/* Wrong network warning on mobile */}
+                {isWrongNetwork && (
+                  <div className="flex items-start gap-2 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-400 leading-relaxed">
+                      Switch to LaunchVault Testnet for full functionality.
+                    </p>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => { disconnectWallet(); setMenuOpen(false); }}
+                  onClick={() => {
+                    disconnectWallet();
+                    setMenuOpen(false);
+                  }}
                   className="w-full text-left px-4 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-colors font-medium"
                 >
                   Disconnect Wallet
@@ -202,7 +265,10 @@ export default function Navbar(): JSX.Element {
       )}
 
       {showDropdown && (
-        <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowDropdown(false)}
+        />
       )}
     </nav>
   );

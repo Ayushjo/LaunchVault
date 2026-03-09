@@ -1,5 +1,27 @@
 export const campaigns = [
   {
+    id: 0,
+    title: "EcoTrace — Carbon Footprint Tracker",
+    description:
+      "A decentralized carbon tracking platform built on Ethereum. Track, verify and offset your carbon footprint transparently on-chain.",
+    category: "CleanTech",
+    status: "active",
+    raised: 0,
+    goal: 0.001,
+    investors: 0,
+    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    tokens: "ECOT",
+    founder: "0x000000000000000000000000000000000000dead",
+    milestone: {
+      description: "Launch MVP with 500 active users",
+      amount: 0.001,
+      voteYes: 0,
+      voteNo: 0,
+      votingActive: false,
+      released: false,
+    },
+  },
+  {
     id: 1,
     title: "EcoTrace - Carbon Footprint Tracker",
     founder: "0x1234...abcd",
