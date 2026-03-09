@@ -1,7 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+
 import { useWallet } from "../context/WalletContext";
-import { campaigns } from "../data/mockData";
+import {
+  voteOnCampaign,
+  fetchCampaignInfo,
+  investInCampaign,
+  type CampaignInfo,
+} from "../hooks/useCampaign";
 import {
   ArrowLeft,
   Zap,
@@ -16,60 +22,12 @@ import {
   Copy,
   ExternalLink,
   AlertCircle,
-  CheckCircle2Icon
 } from "lucide-react";
-import { BrowserProvider, Contract, parseEther } from "ethers";
-import { CAMPAIGN_ABI, CONTRACT_CONFIG } from "../contracts/config";
-interface Campaign {
-  id: number;
-  title: string;
-  description: string;
-  category: string;
-  status: "active" | "voting" | "funded" | "released";
-  raised: number;
-  goal: number;
-  investors: number;
-  deadline: string;
-  tokens: string;
-  founder: string;
-  milestone: {
-    description: string;
-    amount: number;
-    voteYes: number;
-    voteNo: number;
-    votingActive: boolean;
-    released: boolean;
-  };
-}
 
-interface StatusConfigEntry {
-  label: string;
-  color: string;
-  bg: string;
-}
-
-interface Investor {
-  address: string;
-  amount: number;
-  tokens: number;
-  date: string;
-}
-
-interface ProgressBarProps {
-  value: number;
-}
-
-interface VoteBarProps {
-  yes: number;
-  no: number;
-}
-
-interface InvestModalProps {
-  campaign: Campaign;
-  onClose: () => void;
-}
-
-const statusConfig: Record<string, StatusConfigEntry> = {
+const statusConfig: Record<
+  string,
+  { label: string; color: string; bg: string }
+> = {
   active: {
     label: "Live",
     color: "text-emerald-400",
@@ -92,15 +50,20 @@ const statusConfig: Record<string, StatusConfigEntry> = {
   },
 };
 
-const mockInvestors: Investor[] = [
-  { address: "0xA1b2...C3d4", amount: 10, tokens: 1000, date: "2025-03-01" },
-  { address: "0xE5f6...G7h8", amount: 7.5, tokens: 750, date: "2025-03-03" },
-  { address: "0xI9j0...K1l2", amount: 5, tokens: 500, date: "2025-03-05" },
-  { address: "0xM3n4...O5p6", amount: 3, tokens: 300, date: "2025-03-07" },
-  { address: "0xQ7r8...S9t0", amount: 2, tokens: 200, date: "2025-03-09" },
-];
+function formatEth(wei: bigint): string {
+  return (Number(wei) / 1e18).toFixed(6);
+}
 
-function ProgressBar({ value }: ProgressBarProps) {
+function getStatus(
+  info: CampaignInfo,
+): "active" | "voting" | "funded" | "released" {
+  if (info.fundsReleased) return "released";
+  if (info.cancelled) return "released";
+  if (info.goalReached) return "funded";
+  return "active";
+}
+
+function ProgressBar({ value }: { value: number }) {
   return (
     <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
       <div
@@ -113,11 +76,10 @@ function ProgressBar({ value }: ProgressBarProps) {
   );
 }
 
-function VoteBar({ yes, no }: VoteBarProps) {
+function VoteBar({ yes, no }: { yes: number; no: number }) {
   const total = yes + no;
   const yesPercent = total > 0 ? Math.round((yes / total) * 100) : 0;
   const noPercent = total > 0 ? Math.round((no / total) * 100) : 0;
-
   return (
     <div className="space-y-2">
       <div className="flex gap-1 h-2 rounded-full overflow-hidden">
@@ -143,13 +105,23 @@ function VoteBar({ yes, no }: VoteBarProps) {
   );
 }
 
-function InvestModal({ campaign, onClose }: InvestModalProps) {
-  const [amount, setAmount] = useState<string>("");
+function InvestModal({
+  campaignAddress,
+  campaignInfo,
+  onClose,
+}: {
+  campaignAddress: string;
+  campaignInfo: CampaignInfo;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const goal = Number(campaignInfo.goal) / 1e18;
   const estimatedTokens = amount
-    ? Math.floor((parseFloat(amount) / campaign.goal) * 10000)
+    ? Math.floor((parseFloat(amount) / goal) * 10000)
     : 0;
 
   async function handleInvest() {
@@ -157,35 +129,16 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
     try {
       setLoading(true);
       setError(null);
-
-      // Get signer from MetaMask
-      const provider = new BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-
-      // Connect to contract
-      const contract = new Contract(
-        CONTRACT_CONFIG.campaignAddress,
-        CAMPAIGN_ABI,
-        signer,
-      );
-
-      // Send transaction
-      const tx = await contract.invest({
-        value: parseEther(amount),
-      });
-
-      // Wait for confirmation
-      await tx.wait();
-      setTxHash(tx.hash);
+      const hash = await investInCampaign(campaignAddress, amount);
+      setTxHash(hash);
     } catch (err: any) {
-      // Clean up error message for user
-      if (err.message.includes("user rejected")) {
-        setError("Transaction rejected by user");
-      } else if (err.message.includes("insufficient funds")) {
-        setError("Insufficient funds in wallet");
-      } else {
-        setError(err.message.slice(0, 100));
-      }
+      if (err.message.includes("user rejected"))
+        setError("Transaction rejected.");
+      else if (err.message.includes("insufficient funds"))
+        setError("Insufficient funds in wallet.");
+      else if (err.message.includes("Founder cannot invest"))
+        setError("Founder cannot invest in their own campaign.");
+      else setError(err.message.slice(0, 120));
     } finally {
       setLoading(false);
     }
@@ -205,7 +158,6 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Success State */}
         {txHash ? (
           <div className="text-center py-4">
             <div className="relative inline-flex mb-6">
@@ -227,13 +179,12 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
               </p>
             </div>
             <a
-              href={`https://dashboard.tenderly.co/tx/${txHash}`}
+              href={`https://dashboard.tenderly.co`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center justify-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 font-bold mb-4"
             >
-              <ExternalLink className="w-4 h-4" />
-              View on Tenderly
+              <ExternalLink className="w-4 h-4" /> View on Tenderly
             </a>
             <button
               onClick={onClose}
@@ -248,9 +199,8 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
               <h2 className="text-xl font-black text-white mb-1">
                 Invest in Campaign
               </h2>
-              <p className="text-slate-400 text-sm">{campaign.title}</p>
+              <p className="text-slate-400 text-sm">{campaignInfo.title}</p>
             </div>
-
             <div className="space-y-5">
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
@@ -261,9 +211,7 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
                     type="number"
                     placeholder="0.00"
                     value={amount}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setAmount(e.target.value)
-                    }
+                    onChange={(e) => setAmount(e.target.value)}
                     className="w-full bg-slate-800/50 border border-slate-700 text-white text-lg font-bold placeholder-slate-600 px-4 py-3.5 rounded-xl focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
@@ -271,7 +219,7 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
                   </span>
                 </div>
                 <div className="flex gap-2 mt-2">
-                  {["0.1", "0.5", "1", "5"].map((v: string) => (
+                  {["0.001", "0.01", "0.1", "1"].map((v) => (
                     <button
                       key={v}
                       onClick={() => setAmount(v)}
@@ -288,13 +236,16 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">You will receive</span>
                     <span className="text-emerald-400 font-bold font-mono">
-                      {estimatedTokens} {campaign.tokens}
+                      {estimatedTokens} tokens
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Ownership share</span>
                     <span className="text-white font-bold">
-                      {((parseFloat(amount) / campaign.goal) * 100).toFixed(2)}%
+                      {goal > 0
+                        ? ((parseFloat(amount) / goal) * 100).toFixed(2)
+                        : 0}
+                      %
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -346,14 +297,50 @@ function InvestModal({ campaign, onClose }: InvestModalProps) {
 
 export default function CampaignDetails() {
   const { id } = useParams<{ id: string }>();
-  const campaign = campaigns.find(
-    (c) => c.id === parseInt(id ?? ""),
-  ) as unknown as Campaign | undefined;
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [userVote, setUserVote] = useState<"yes" | "no" | null>(null);
   const { wallet, connectWallet } = useWallet();
+  const [campaignInfo, setCampaignInfo] = useState<CampaignInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [userVote, setUserVote] = useState<"yes" | "no" | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  if (!campaign) {
+  const campaignAddress = id ?? "";
+
+  useEffect(() => {
+    if (!campaignAddress) return;
+    async function load() {
+      try {
+        const info = await fetchCampaignInfo(campaignAddress);
+        setCampaignInfo(info);
+      } catch (err) {
+        console.error("Failed to load campaign:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [campaignAddress]);
+
+  function copyAddress() {
+    navigator.clipboard.writeText(campaignAddress);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400 font-medium">
+            Loading campaign from chain...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!campaignInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center px-4">
         <div>
@@ -375,21 +362,24 @@ export default function CampaignDetails() {
     );
   }
 
-  const progress = Math.min((campaign.raised / campaign.goal) * 100, 100);
+  const goal = Number(campaignInfo.goal) / 1e18;
+  const raised = Number(campaignInfo.totalRaised) / 1e18;
+  const progress = goal > 0 ? Math.min((raised / goal) * 100, 100) : 0;
+  const deadline = new Date(Number(campaignInfo.deadline) * 1000);
   const daysLeft = Math.max(
     0,
-    Math.ceil(
-      (new Date(campaign.deadline).getTime() - new Date().getTime()) /
-        (1000 * 60 * 60 * 24),
-    ),
+    Math.ceil((deadline.getTime() - Date.now()) / 86400000),
   );
-  const status = statusConfig[campaign.status] ?? statusConfig.active;
-  const { milestone } = campaign;
+  const status = statusConfig[getStatus(campaignInfo)];
 
   return (
     <div className="min-h-screen pb-24">
       {showModal && (
-        <InvestModal campaign={campaign} onClose={() => setShowModal(false)} />
+        <InvestModal
+          campaignAddress={campaignAddress}
+          campaignInfo={campaignInfo}
+          onClose={() => setShowModal(false)}
+        />
       )}
 
       <div className="absolute top-16 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
@@ -404,9 +394,9 @@ export default function CampaignDetails() {
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* LEFT COLUMN */}
+          {/* LEFT */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Header Card */}
+            {/* Header */}
             <div className="glass-card rounded-3xl p-8">
               <div className="flex items-center gap-3 mb-5">
                 <span
@@ -414,16 +404,28 @@ export default function CampaignDetails() {
                 >
                   {status.label}
                 </span>
-                <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
-                  {campaign.category}
-                </span>
+                <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500">
+                  <span>
+                    {campaignAddress.slice(0, 10)}...{campaignAddress.slice(-6)}
+                  </span>
+                  <button
+                    onClick={copyAddress}
+                    className="hover:text-slate-300 transition-colors"
+                  >
+                    {copied ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <h1 className="text-3xl sm:text-4xl font-black text-white mb-4 leading-tight">
-                {campaign.title}
+                {campaignInfo.title}
               </h1>
               <p className="text-slate-400 leading-relaxed text-base mb-6">
-                {campaign.description}
+                {campaignInfo.description}
               </p>
 
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-white/5">
@@ -432,7 +434,7 @@ export default function CampaignDetails() {
                     <TrendingUp className="w-4 h-4" />
                   </div>
                   <div className="text-xl font-black text-white">
-                    {campaign.raised} ETH
+                    {raised.toFixed(4)} ETH
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">Raised</div>
                 </div>
@@ -440,9 +442,7 @@ export default function CampaignDetails() {
                   <div className="flex items-center justify-center gap-1.5 text-emerald-500 mb-1">
                     <Users className="w-4 h-4" />
                   </div>
-                  <div className="text-xl font-black text-white">
-                    {campaign.investors}
-                  </div>
+                  <div className="text-xl font-black text-white">—</div>
                   <div className="text-xs text-slate-500 mt-0.5">Investors</div>
                 </div>
                 <div className="text-center">
@@ -457,7 +457,7 @@ export default function CampaignDetails() {
               </div>
             </div>
 
-            {/* Milestone + Voting */}
+            {/* Milestone */}
             <div className="glass-card rounded-3xl p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl">
@@ -469,7 +469,7 @@ export default function CampaignDetails() {
                     Fund release requires investor approval
                   </p>
                 </div>
-                {milestone.released && (
+                {campaignInfo.fundsReleased && (
                   <span className="ml-auto flex items-center gap-1 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Released
                   </span>
@@ -478,12 +478,12 @@ export default function CampaignDetails() {
 
               <div className="bg-slate-800/30 rounded-2xl p-5 mb-6">
                 <p className="text-slate-300 font-medium leading-relaxed">
-                  {milestone.description}
+                  {campaignInfo.milestoneDescription}
                 </p>
                 <div className="flex items-center gap-4 mt-3">
                   <span className="text-xs text-slate-500">Release amount</span>
                   <span className="text-emerald-400 font-black">
-                    {milestone.amount} ETH
+                    {goal} ETH
                   </span>
                 </div>
               </div>
@@ -492,28 +492,68 @@ export default function CampaignDetails() {
                 <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">
                   Voting Status
                 </h3>
-                <VoteBar yes={milestone.voteYes} no={milestone.voteNo} />
+                <VoteBar yes={0} no={0} />
 
-                {milestone.votingActive && !userVote && (
+                {!campaignInfo.goalReached && (
+                  <div className="flex items-center gap-2 text-slate-500 text-sm bg-slate-800/30 rounded-xl p-4">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    Voting opens once the funding goal is reached.
+                  </div>
+                )}
+
+                {campaignInfo.goalReached && !campaignInfo.fundsReleased && (
                   <div className="pt-2">
                     <p className="text-xs text-slate-500 mb-3">
                       Cast your vote as an investor
                     </p>
                     {wallet ? (
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setUserVote("yes")}
-                          className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-3 rounded-xl transition-all active:scale-95"
+                      userVote ? (
+                        <div
+                          className={`flex items-center gap-2 p-4 rounded-xl border ${
+                            userVote === "yes"
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              : "bg-red-500/10 border-red-500/20 text-red-400"
+                          }`}
                         >
-                          <ThumbsUp className="w-4 h-4" /> Vote Yes
-                        </button>
-                        <button
-                          onClick={() => setUserVote("no")}
-                          className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-3 rounded-xl transition-all active:scale-95"
-                        >
-                          <ThumbsDown className="w-4 h-4" /> Vote No
-                        </button>
-                      </div>
+                          {userVote === "yes" ? (
+                            <ThumbsUp className="w-4 h-4" />
+                          ) : (
+                            <ThumbsDown className="w-4 h-4" />
+                          )}
+                          <span className="font-bold text-sm">
+                            Vote submitted on-chain ✓
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={async () => {
+                              try {
+                                await voteOnCampaign(campaignAddress, true);
+                                setUserVote("yes");
+                              } catch (err: any) {
+                                alert(err.message.slice(0, 100));
+                              }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-3 rounded-xl transition-all active:scale-95"
+                          >
+                            <ThumbsUp className="w-4 h-4" /> Vote Yes
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                await voteOnCampaign(campaignAddress, false);
+                                setUserVote("no");
+                              } catch (err: any) {
+                                alert(err.message.slice(0, 100));
+                              }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-3 rounded-xl transition-all active:scale-95"
+                          >
+                            <ThumbsDown className="w-4 h-4" /> Vote No
+                          </button>
+                        </div>
+                      )
                     ) : (
                       <button
                         onClick={connectWallet}
@@ -525,103 +565,85 @@ export default function CampaignDetails() {
                     )}
                   </div>
                 )}
-
-                {userVote && (
-                  <div
-                    className={`flex items-center gap-2 p-4 rounded-xl border ${
-                      userVote === "yes"
-                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                        : "bg-red-500/10 border-red-500/20 text-red-400"
-                    }`}
-                  >
-                    {userVote === "yes" ? (
-                      <ThumbsUp className="w-4 h-4" />
-                    ) : (
-                      <ThumbsDown className="w-4 h-4" />
-                    )}
-                    <span className="font-bold text-sm">
-                      You voted {userVote === "yes" ? "Yes" : "No"} — vote
-                      recorded
-                    </span>
-                  </div>
-                )}
-
-                {!milestone.votingActive && !milestone.released && (
-                  <div className="flex items-center gap-2 text-slate-500 text-sm bg-slate-800/30 rounded-xl p-4">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    Voting hasn't started yet. The founder must request
-                    milestone release first.
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Investor List */}
+            {/* Contract Info */}
             <div className="glass-card rounded-3xl p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl">
-                  <Users className="w-5 h-5 text-emerald-500" />
+                  <ExternalLink className="w-5 h-5 text-emerald-500" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-black text-white">Investors</h2>
+                  <h2 className="text-lg font-black text-white">
+                    On-Chain Info
+                  </h2>
                   <p className="text-xs text-slate-500">
-                    {campaign.investors} backers on-chain
+                    Verified smart contract
                   </p>
                 </div>
               </div>
-
               <div className="space-y-3">
-                {mockInvestors.map((inv: Investor, i: number) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between bg-slate-800/30 hover:bg-slate-800/50 rounded-xl px-4 py-3 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500/20 to-slate-700 border border-slate-600 flex items-center justify-center text-xs font-black text-emerald-400">
-                        {i + 1}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-300 font-mono text-sm">
-                            {inv.address}
-                          </span>
-                          <button className="text-slate-600 hover:text-slate-400 transition-colors">
-                            <Copy className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <span className="text-xs text-slate-500">
-                          {inv.date}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-bold text-sm">
-                        {inv.amount} ETH
-                      </div>
-                      <div className="text-emerald-400 font-mono text-xs">
-                        {inv.tokens} {campaign.tokens}
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between bg-slate-800/30 rounded-xl px-4 py-3">
+                  <span className="text-xs text-slate-500">
+                    Contract Address
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-300">
+                      {campaignAddress.slice(0, 10)}...
+                      {campaignAddress.slice(-6)}
+                    </span>
+                    <button
+                      onClick={copyAddress}
+                      className="text-slate-500 hover:text-slate-300"
+                    >
+                      {copied ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                   </div>
-                ))}
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/30 rounded-xl px-4 py-3">
+                  <span className="text-xs text-slate-500">Founder</span>
+                  <span className="text-xs font-mono text-slate-300">
+                    {campaignInfo.founder.slice(0, 10)}...
+                    {campaignInfo.founder.slice(-6)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-slate-800/30 rounded-xl px-4 py-3">
+                  <span className="text-xs text-slate-500">Network</span>
+                  <span className="text-xs font-bold text-emerald-400">
+                    LaunchVault Testnet (9991)
+                  </span>
+                </div>
+                <a
+                  href="https://dashboard.tenderly.co"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition-colors font-medium px-4 py-2"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> View on Tenderly
+                </a>
               </div>
             </div>
           </div>
 
-          {/* RIGHT COLUMN — Sticky Sidebar */}
+          {/* RIGHT SIDEBAR */}
           <div className="space-y-5">
             <div className="glass-card rounded-3xl p-6 sticky top-24">
               <div className="mb-5">
                 <div className="flex justify-between items-baseline mb-1">
                   <span className="text-3xl font-black text-white">
-                    {campaign.raised} ETH
+                    {raised.toFixed(4)} ETH
                   </span>
                   <span className="text-emerald-400 font-bold">
                     {Math.round(progress)}%
                   </span>
                 </div>
                 <p className="text-slate-500 text-sm mb-3">
-                  raised of {campaign.goal} ETH goal
+                  raised of {goal} ETH goal
                 </p>
                 <ProgressBar value={progress} />
               </div>
@@ -629,22 +651,27 @@ export default function CampaignDetails() {
               <div className="grid grid-cols-2 gap-3 mb-5 pt-4 border-t border-white/5">
                 <div className="bg-slate-800/30 rounded-xl p-3 text-center">
                   <div className="text-lg font-black text-white">
-                    {campaign.investors}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">Backers</div>
-                </div>
-                <div className="bg-slate-800/30 rounded-xl p-3 text-center">
-                  <div className="text-lg font-black text-white">
                     {daysLeft > 0 ? `${daysLeft}d` : "—"}
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">Days Left</div>
+                </div>
+                <div className="bg-slate-800/30 rounded-xl p-3 text-center">
+                  <div className="text-lg font-black text-white">
+                    {Math.round(progress)}%
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">Funded</div>
                 </div>
               </div>
 
               {wallet ? (
                 <button
                   onClick={() => setShowModal(true)}
-                  disabled={daysLeft === 0 || campaign.status === "released"}
+                  disabled={
+                    campaignInfo.fundsReleased ||
+                    campaignInfo.cancelled ||
+                    campaignInfo.goalReached ||
+                    daysLeft === 0
+                  }
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 shadow-lg shadow-emerald-900/40 mb-3"
                 >
                   Invest Now
@@ -654,14 +681,14 @@ export default function CampaignDetails() {
                   onClick={connectWallet}
                   className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 mb-3 flex items-center justify-center gap-2"
                 >
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  Connect Wallet to Invest
+                  <Zap className="w-4 h-4 text-emerald-400" /> Connect Wallet to
+                  Invest
                 </button>
               )}
 
               <div className="flex items-center justify-center gap-1.5 text-slate-500 text-xs">
-                <Shield className="w-3.5 h-3.5" />
-                Funds locked in smart contract
+                <Shield className="w-3.5 h-3.5" /> Funds locked in smart
+                contract
               </div>
             </div>
 
@@ -671,12 +698,6 @@ export default function CampaignDetails() {
                 Token Info
               </h3>
               <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Symbol</span>
-                  <span className="text-emerald-400 font-bold font-mono">
-                    {campaign.tokens}
-                  </span>
-                </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Total Supply</span>
                   <span className="text-white font-bold">10,000</span>
@@ -689,10 +710,30 @@ export default function CampaignDetails() {
                   <span className="text-slate-400">Voting</span>
                   <span className="text-white font-bold">1 token = 1 vote</span>
                 </div>
+                {wallet ? (
+                  <button
+                    onClick={() => setShowModal(true)}
+                    disabled={
+                      campaignInfo.fundsReleased ||
+                      campaignInfo.cancelled ||
+                      campaignInfo.goalReached ||
+                      daysLeft === 0
+                    }
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-xl transition-all duration-200 active:scale-95 shadow-lg shadow-emerald-900/40 mb-3"
+                  >
+                    {campaignInfo.goalReached
+                      ? "Goal Reached ✓"
+                      : campaignInfo.fundsReleased
+                        ? "Completed"
+                        : "Invest Now"}
+                  </button>
+                ) : (
+                  <></>
+                )}
               </div>
             </div>
 
-            {/* Founder Info */}
+            {/* Founder */}
             <div className="glass-card rounded-3xl p-6">
               <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4">
                 Founder
@@ -702,21 +743,12 @@ export default function CampaignDetails() {
                   F
                 </div>
                 <div>
-                  <div className="text-slate-300 font-mono text-sm">
-                    {campaign.founder}
+                  <div className="text-slate-300 font-mono text-xs break-all">
+                    {campaignInfo.founder}
                   </div>
                   <div className="text-xs text-slate-500">Campaign Creator</div>
                 </div>
               </div>
-              <a
-                href={`https://polygonscan.com/address/${campaign.founder}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition-colors font-medium"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                View on PolygonScan
-              </a>
             </div>
           </div>
         </div>

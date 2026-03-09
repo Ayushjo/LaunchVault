@@ -1,168 +1,141 @@
-import { useState, useEffect } from "react";
-import { BrowserProvider, Contract, parseEther, formatEther } from "ethers";
-import { CAMPAIGN_ABI, CONTRACT_CONFIG } from "../contracts/config";
+import { BrowserProvider, Contract, parseEther } from "ethers";
+import {
+  CAMPAIGN_ABI,
+  FACTORY_ABI,
+  CONTRACT_CONFIG,
+} from "../contracts/config";
 
-export function useCampaign() {
-  const [contract, setContract] = useState<Contract | null>(null);
-  const [campaignInfo, setCampaignInfo] = useState<any>(null);
-  const [votingStatus, setVotingStatus] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export interface OnChainCampaign {
+  address: string;
+  founder: string;
+  title: string;
+  goal: bigint;
+  deadline: bigint;
+  createdAt: bigint;
+}
 
-  // Initialize contract
-  async function initContract() {
-    if (!window.ethereum) return null;
-    const provider = new BrowserProvider(window.ethereum);
-    const signer = await provider.getSigner();
-    const c = new Contract(
-      CONTRACT_CONFIG.campaignAddress,
-      CAMPAIGN_ABI,
-      signer,
-    );
-    setContract(c);
-    return c;
-  }
+export interface CampaignInfo {
+  founder: string;
+  title: string;
+  description: string;
+  milestoneDescription: string;
+  goal: bigint;
+  deadline: bigint;
+  totalRaised: bigint;
+  goalReached: boolean;
+  fundsReleased: boolean;
+  cancelled: boolean;
+}
 
-  // Read campaign info from chain
-  async function fetchCampaignInfo() {
-    try {
-      const c = contract ?? (await initContract());
-      if (!c) return;
-      const info = await c.getCampaignInfo();
-      setCampaignInfo({
-        founder: info._founder,
-        title: info._title,
-        description: info._description,
-        milestoneDescription: info._milestoneDescription,
-        goal: formatEther(info._goal),
-        deadline: Number(info._deadline),
-        totalRaised: formatEther(info._totalRaised),
-        goalReached: info._goalReached,
-        fundsReleased: info._fundsReleased,
-        cancelled: info._cancelled,
-      });
+// Get all campaigns from factory
+export async function fetchAllCampaigns(): Promise<OnChainCampaign[]> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const factory = new Contract(
+    CONTRACT_CONFIG.factoryAddress,
+    FACTORY_ABI,
+    provider,
+  );
+  const campaigns = await factory.getCampaigns();
+  return campaigns.map((c: any) => ({
+    address: c.campaignAddress,
+    founder: c.founder,
+    title: c.title,
+    goal: c.goal,
+    deadline: c.deadline,
+    createdAt: c.createdAt,
+  }));
+}
 
-      const vs = await c.getVotingStatus();
-      setVotingStatus({
-        active: vs.active,
-        voteYes: vs.yes.toString(),
-        voteNo: vs.no.toString(),
-        timeLeft: Number(vs.timeLeft),
-      });
-    } catch (err: any) {
-      setError(err.message);
-    }
-  }
-
-  // Invest function
-  async function invest(amountEth: string) {
-    try {
-      setLoading(true);
-      setError(null);
-      const c = contract ?? (await initContract());
-      if (!c) throw new Error("Contract not initialized");
-      const tx = await c.invest({ value: parseEther(amountEth) });
-      await tx.wait();
-      await fetchCampaignInfo();
-      return tx.hash;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Vote function
-  async function vote(approve: boolean) {
-    try {
-      setLoading(true);
-      setError(null);
-      const c = contract ?? (await initContract());
-      if (!c) throw new Error("Contract not initialized");
-      const tx = await c.vote(approve);
-      await tx.wait();
-      await fetchCampaignInfo();
-      return tx.hash;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Start voting (founder only)
-  async function startVoting() {
-    try {
-      setLoading(true);
-      setError(null);
-      const c = contract ?? (await initContract());
-      if (!c) throw new Error("Contract not initialized");
-      const tx = await c.startVoting();
-      await tx.wait();
-      await fetchCampaignInfo();
-      return tx.hash;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Release funds (founder only)
-  async function releaseFunds() {
-    try {
-      setLoading(true);
-      setError(null);
-      const c = contract ?? (await initContract());
-      if (!c) throw new Error("Contract not initialized");
-      const tx = await c.releaseFunds();
-      await tx.wait();
-      await fetchCampaignInfo();
-      return tx.hash;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Claim refund
-  async function claimRefund() {
-    try {
-      setLoading(true);
-      setError(null);
-      const c = contract ?? (await initContract());
-      if (!c) throw new Error("Contract not initialized");
-      const tx = await c.claimRefund();
-      await tx.wait();
-      await fetchCampaignInfo();
-      return tx.hash;
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchCampaignInfo();
-  }, []);
-
+// Get single campaign details
+export async function fetchCampaignInfo(
+  address: string,
+): Promise<CampaignInfo> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const campaign = new Contract(address, CAMPAIGN_ABI, provider);
+  const info = await campaign.getCampaignInfo();
   return {
-    campaignInfo,
-    votingStatus,
-    loading,
-    error,
-    invest,
-    vote,
-    startVoting,
-    releaseFunds,
-    claimRefund,
-    fetchCampaignInfo,
+    founder: info[0],
+    title: info[1],
+    description: info[2],
+    milestoneDescription: info[3],
+    goal: info[4],
+    deadline: info[5],
+    totalRaised: info[6],
+    goalReached: info[7],
+    fundsReleased: info[8],
+    cancelled: info[9],
   };
+}
+
+// Invest in a campaign
+export async function investInCampaign(
+  address: string,
+  amountEth: string,
+): Promise<string> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const signer = await provider.getSigner();
+  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
+  const tx = await campaign.invest({ value: parseEther(amountEth) });
+  await tx.wait();
+  return tx.hash;
+}
+
+// Deploy new campaign via factory
+export async function createCampaign(params: {
+  title: string;
+  description: string;
+  milestoneDescription: string;
+  goal: string;
+  deadline: string;
+  tokenSymbol: string;
+}): Promise<string> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const signer = await provider.getSigner();
+  const factory = new Contract(
+    CONTRACT_CONFIG.factoryAddress,
+    FACTORY_ABI,
+    signer,
+  );
+
+  const goalWei = parseEther(params.goal);
+  const deadlineTs = BigInt(
+    Math.floor(new Date(params.deadline).getTime() / 1000),
+  );
+  const tokenName = params.title.split(" ")[0] + " Token";
+
+  const tx = await factory.createCampaign(
+    params.title,
+    params.description,
+    params.milestoneDescription,
+    goalWei,
+    deadlineTs,
+    tokenName,
+    params.tokenSymbol,
+  );
+
+  const receipt = await tx.wait();
+
+  // Extract deployed campaign address from event
+  const iface = factory.interface;
+  for (const log of receipt.logs) {
+    try {
+      const parsed = iface.parseLog(log);
+      if (parsed?.name === "CampaignCreated") {
+        return parsed.args[0]; // campaignAddress
+      }
+    } catch {}
+  }
+
+  throw new Error("Could not find CampaignCreated event in receipt");
+}
+export async function voteOnCampaign(
+  address: string,
+  approve: boolean,
+): Promise<string> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const signer = await provider.getSigner();
+  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
+  const tx = await campaign.vote(approve);
+  await tx.wait();
+  return tx.hash;
 }
