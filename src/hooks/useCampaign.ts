@@ -139,3 +139,26 @@ export async function voteOnCampaign(
   await tx.wait();
   return tx.hash;
 }
+
+export async function startVoting(address: string): Promise<string> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const signer = await provider.getSigner();
+  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
+  const tx = await campaign.startVoting();
+  await tx.wait();
+  return tx.hash;
+}
+
+export async function getVotingStatus(
+  address: string,
+): Promise<{
+  active: boolean;
+  endTime: bigint;
+  yesVotes: bigint;
+  noVotes: bigint;
+}> {
+  const provider = new BrowserProvider((window as any).ethereum);
+  const contract = new Contract(address, CAMPAIGN_ABI, provider);
+  const [active, endTime, yesVotes, noVotes] = await contract.getVotingStatus();
+  return { active, endTime, yesVotes, noVotes };
+}
