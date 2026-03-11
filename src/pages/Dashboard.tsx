@@ -1,7 +1,6 @@
 import { useState, useEffect, type JSX } from "react";
 import { Link } from "react-router-dom";
 import { useWallet } from "../context/WalletContext";
-
 import {
   getVotingStatus,
   fetchAllCampaigns,
@@ -32,7 +31,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 function fmtEth(wei: bigint, decimals = 4) {
   return (Number(wei) / 1e18).toFixed(decimals);
 }
@@ -42,36 +41,49 @@ function daysLeft(deadline: bigint) {
     Math.ceil((Number(deadline) * 1000 - Date.now()) / 86400000),
   );
 }
+function fmtTokens(raw: number): string {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(raw / 1e18);
+}
+
 const statusConfig: Record<
   string,
-  { label: string; color: string; bg: string }
+  { label: string; color: string; bg: string; dot: string }
 > = {
   active: {
     label: "Live",
     color: "text-emerald-400",
     bg: "bg-emerald-500/10 border-emerald-500/20",
+    dot: "bg-emerald-400",
   },
   funded: {
     label: "Funded",
-    color: "text-blue-400",
-    bg: "bg-blue-500/10 border-blue-500/20",
+    color: "text-sky-400",
+    bg: "bg-sky-500/10 border-sky-500/20",
+    dot: "bg-sky-400",
   },
   voting: {
     label: "Voting",
     color: "text-amber-400",
     bg: "bg-amber-500/10 border-amber-500/20",
+    dot: "bg-amber-400",
   },
   released: {
     label: "Completed",
-    color: "text-slate-300",
-    bg: "bg-slate-800 border-slate-700",
+    color: "text-zinc-400",
+    bg: "bg-zinc-800 border-zinc-700",
+    dot: "bg-zinc-400",
   },
   cancelled: {
     label: "Cancelled",
     color: "text-red-400",
     bg: "bg-red-500/10 border-red-500/20",
+    dot: "bg-red-400",
   },
 };
+
 function getStatus(
   info: CampaignInfo,
 ): "active" | "funded" | "voting" | "released" | "cancelled" {
@@ -106,70 +118,88 @@ async function getTokenBalance(
   }
 }
 
-// ── sub-components ───────────────────────────────────────────────────────────
-function ProgressBar({ value }: { value: number }): JSX.Element {
+// ── shared primitives ─────────────────────────────────────────────────────────
+function Spinner({ color = "border-t-white" }: { color?: string }) {
   return (
-    <div className="w-full bg-slate-800/50 rounded-full h-1.5 overflow-hidden">
-      <div
-        className="h-full bg-emerald-500 transition-all duration-700 relative"
-        style={{ width: `${Math.min(value, 100)}%` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/20" />
-      </div>
-    </div>
+    <div
+      className={`w-3.5 h-3.5 border border-white/20 ${color} rounded-full animate-spin`}
+    />
   );
 }
 
-function StatCard({
-  icon: Icon,
-  value,
-  label,
-  sub,
-}: {
-  icon: LucideIcon;
-  value: string | number;
-  label: string;
-  sub?: string;
-}): JSX.Element {
+function ProgressBar({ value }: { value: number }): JSX.Element {
   return (
-    <div className="glass-card rounded-2xl p-4 sm:p-5 flex items-center gap-3 sm:gap-4">
-      <div className="relative shrink-0">
-        <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
-        <div className="relative bg-emerald-500/10 border border-emerald-500/20 p-2.5 sm:p-3 rounded-xl">
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-        </div>
-      </div>
-      <div className="min-w-0">
-        <div className="text-xl sm:text-2xl font-black text-white truncate">
-          {value}
-        </div>
-        <div className="text-slate-400 text-xs font-medium truncate">
-          {label}
-        </div>
-        {sub && (
-          <div className="text-emerald-400 text-xs font-bold mt-0.5 truncate">
-            {sub}
-          </div>
+    <div className="w-full bg-zinc-800 rounded-full h-[4px] overflow-visible relative">
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-400 relative transition-all duration-700"
+        style={{ width: `${Math.min(value, 100)}%` }}
+      >
+        {value > 2 && value < 100 && (
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white shadow-[0_0_6px_2px_rgba(255,255,255,0.7)]" />
         )}
       </div>
     </div>
   );
 }
 
-const statusBadge: Record<string, string> = {
-  active: "bg-emerald-500/10 border-emerald-500/20 text-emerald-400",
-  funded: "bg-blue-500/10 border-blue-500/20 text-blue-400",
-  voting: "bg-amber-500/10 border-amber-500/20 text-amber-400",
-  released: "bg-slate-800 border-slate-700 text-slate-300",
-  cancelled: "bg-red-500/10 border-red-500/20 text-red-400",
-};
-const statusLabel: Record<string, string> = {
-  active: "Live",
-  funded: "Funded",
-  voting: "Voting",
-  released: "Completed",
-  cancelled: "Cancelled",
-};
+function VoteBar({ yes, no }: { yes: number; no: number }) {
+  return (
+    <div className="w-full bg-zinc-800 rounded-full h-[4px] overflow-hidden">
+      <div className="h-full flex">
+        <div
+          className="bg-emerald-500 transition-all duration-500"
+          style={{ width: `${yes}%` }}
+        />
+        <div
+          className="bg-red-500/50 transition-all duration-500"
+          style={{ width: `${no}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const cfg = statusConfig[status] ?? statusConfig.active;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.color}`}
+    >
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} ${status === "active" || status === "voting" ? "animate-pulse" : ""}`}
+      />
+      {label ?? cfg.label}
+    </span>
+  );
+}
+
+// ── Command Strip (replaces StatCard grid) ───────────────────────────────────
+function CommandStrip({
+  stats,
+}: {
+  stats: { icon: LucideIcon; value: string | number; label: string }[];
+}): JSX.Element {
+  return (
+    <div className="bg-white/[0.02] border border-white/[0.05] backdrop-blur-2xl rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-white/[0.05] divide-y sm:divide-y-0">
+        {stats.map(({ icon: Icon, value, label }, i) => (
+          <div
+            key={i}
+            className="flex flex-col items-center justify-center gap-1.5 py-5 px-4"
+          >
+            <Icon className="w-3.5 h-3.5 text-zinc-600 mb-0.5" />
+            <span className="font-mono text-xl font-bold text-white tracking-tight">
+              {value}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold text-center">
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ── Founder Dashboard ─────────────────────────────────────────────────────────
 interface CampaignWithInfo {
@@ -278,10 +308,10 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Loading your campaigns...</p>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
+          <p className="text-zinc-500 text-sm">Loading your campaigns...</p>
         </div>
       </div>
     );
@@ -293,45 +323,35 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
   const released = items.filter((i) => i.info.fundsReleased).length;
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-fade-in">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          icon={TrendingUp}
-          value={`${totalRaised.toFixed(4)} ETH`}
-          label="Total Raised"
-          sub="All campaigns"
-        />
-        <StatCard
-          icon={BarChart3}
-          value={items.length}
-          label="Campaigns"
-          sub="Deployed"
-        />
-        <StatCard
-          icon={Shield}
-          value={released}
-          label="Released"
-          sub="Funds sent"
-        />
-        <StatCard
-          icon={Users}
-          value={items.filter((i) => i.info.goalReached).length}
-          label="Funded"
-          sub="Goal reached"
-        />
-      </div>
+    <div className="space-y-6 sm:space-y-8">
+      <CommandStrip
+        stats={[
+          {
+            icon: TrendingUp,
+            value: `${totalRaised.toFixed(4)}`,
+            label: "ETH Raised",
+          },
+          { icon: BarChart3, value: items.length, label: "Campaigns" },
+          { icon: Shield, value: released, label: "Released" },
+          {
+            icon: Users,
+            value: items.filter((i) => i.info.goalReached).length,
+            label: "Funded",
+          },
+        ]}
+      />
 
       <div>
-        <div className="flex items-center justify-between mb-4 sm:mb-5">
-          <h2 className="text-lg sm:text-xl font-black text-white">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-white tracking-tight">
             Your Campaigns
           </h2>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               onClick={load}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-zinc-600 hover:text-zinc-300 transition-colors"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
             <Link
               to="/create"
@@ -343,16 +363,16 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
         </div>
 
         {items.length === 0 ? (
-          <div className="glass-card rounded-3xl p-12 text-center">
-            <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 mb-4">
-              You haven't created any campaigns yet.
+          <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-12 text-center">
+            <BarChart3 className="w-8 h-8 text-zinc-700 mx-auto mb-4" />
+            <p className="text-zinc-500 text-sm mb-5">
+              No campaigns deployed yet.
             </p>
             <Link
               to="/create"
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition-all text-sm"
+              className="inline-flex items-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400 text-white font-bold px-5 py-2.5 rounded-xl transition-all text-sm shadow-[0_0_16px_rgba(16,185,129,0.1)]"
             >
-              <Zap className="w-4 h-4" /> Create Campaign
+              <Zap className="w-3.5 h-3.5 text-emerald-400" /> Create Campaign
             </Link>
           </div>
         ) : (
@@ -367,7 +387,6 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
               const rKey = campaign.address + "_release";
               const vAction = actionMap[campaign.address];
               const rAction = actionMap[rKey];
-
               const yesVotes = Number(votingStatus.yesVotes);
               const noVotes = Number(votingStatus.noVotes);
               const totalVotes = yesVotes + noVotes;
@@ -378,7 +397,6 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
               const votingEnded = !isVotingActive && totalVotes > 0;
               const canRelease =
                 votingEnded && yesPercent > 50 && !info.fundsReleased;
-
               const status = (() => {
                 if (info.cancelled) return "cancelled";
                 if (info.fundsReleased) return "released";
@@ -390,51 +408,47 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
               return (
                 <div
                   key={campaign.address}
-                  className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5"
+                  className="bg-zinc-900/40 border border-white/[0.05] hover:border-emerald-500/20 backdrop-blur-xl rounded-2xl p-5 sm:p-6 space-y-5 transition-all duration-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span
-                          className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusConfig[status]?.bg ?? "bg-slate-800 border-slate-700"} ${statusConfig[status]?.color ?? "text-slate-300"}`}
-                        >
-                          {statusConfig[status]?.label ?? status}
-                        </span>
-                        <span className="text-xs font-mono text-slate-500 truncate">
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <StatusBadge status={status} />
+                        <span className="text-[10px] font-mono text-zinc-600 truncate">
                           {campaign.address.slice(0, 10)}...
                           {campaign.address.slice(-6)}
                         </span>
                       </div>
-                      <h3 className="text-white font-black text-base sm:text-lg leading-tight">
+                      <h3 className="text-white font-bold text-base leading-tight tracking-tight">
                         {info.title}
                       </h3>
                     </div>
                     <Link
                       to={`/campaign/${campaign.address}`}
-                      className="shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-400 transition-colors font-medium bg-slate-800/50 px-2.5 py-1.5 rounded-lg"
+                      className="shrink-0 flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-emerald-400 transition-colors font-medium bg-white/[0.03] border border-white/[0.05] px-2.5 py-1.5 rounded-lg"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3 h-3" />
                       <span className="hidden sm:inline">View</span>
                     </Link>
                   </div>
 
                   {/* Progress */}
-                  <div>
-                    <div className="flex justify-between items-baseline mb-2">
-                      <span className="text-white font-bold text-sm">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-baseline">
+                      <span className="font-mono text-sm text-white font-bold">
                         {raised.toFixed(4)}
-                        <span className="text-slate-500 font-normal">
+                        <span className="text-zinc-600 font-normal">
                           {" "}
                           / {goal} ETH
                         </span>
                       </span>
-                      <span className="text-emerald-400 font-bold text-sm">
+                      <span className="font-mono text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
                         {Math.round(progress)}%
                       </span>
                     </div>
                     <ProgressBar value={progress} />
-                    <div className="flex justify-between mt-2 text-xs text-slate-500">
+                    <div className="flex justify-between text-[11px] text-zinc-600">
                       <span>{dl > 0 ? `${dl}d left` : "Deadline passed"}</span>
                       <span>
                         {info.goalReached
@@ -444,31 +458,31 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                     </div>
                   </div>
 
-                  {/* Milestone */}
-                  <div className="bg-slate-800/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                  {/* Milestone zone */}
+                  <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">
                         Milestone
                       </span>
                       {info.fundsReleased && (
-                        <span className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Released
+                        <span className="flex items-center gap-1 text-emerald-400 text-[10px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" /> Released
                         </span>
                       )}
                     </div>
-                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed line-clamp-2">
+                    <p className="text-zinc-400 text-xs leading-relaxed line-clamp-2">
                       {info.milestoneDescription}
                     </p>
 
                     {/* Goal not reached */}
                     {!info.goalReached && !info.fundsReleased && (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        Goal not reached — milestone locked
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> Goal not
+                        reached — milestone locked
                       </div>
                     )}
 
-                    {/* Goal reached, voting not started */}
+                    {/* Start voting */}
                     {info.goalReached &&
                       !isVotingActive &&
                       !votingEnded &&
@@ -478,11 +492,11 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                           <button
                             onClick={() => doStartVoting(campaign.address)}
                             disabled={vAction?.loading || vAction?.done}
-                            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                            className="w-full flex items-center justify-center gap-2 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {vAction?.loading ? (
                               <>
-                                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <Spinner color="border-t-sky-400" />
                                 Starting...
                               </>
                             ) : vAction?.done ? (
@@ -498,41 +512,32 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                             )}
                           </button>
                           {vAction?.error && (
-                            <p className="text-xs text-red-400">
+                            <p className="text-[11px] text-red-400">
                               {vAction.error}
                             </p>
                           )}
                         </>
                       )}
 
-                    {/* Voting in progress */}
+                    {/* Voting active */}
                     {isVotingActive && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
-                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-bold">
+                          <Clock className="w-3 h-3 shrink-0 animate-pulse" />
                           Voting in progress — ends when all investors vote
                         </div>
-                        <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-slate-800">
-                          <div
-                            className="bg-emerald-500 transition-all"
-                            style={{ width: `${yesPercent}%` }}
-                          />
-                          <div
-                            className="bg-red-500/70 transition-all"
-                            style={{ width: `${noPercent}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                            <ThumbsUp className="w-3 h-3" /> {yesVotes} Yes (
-                            {yesPercent}%)
+                        <VoteBar yes={yesPercent} no={noPercent} />
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-emerald-400 font-mono font-semibold flex items-center gap-1">
+                            <ThumbsUp className="w-2.5 h-2.5" /> {yesVotes} Yes
+                            ({yesPercent}%)
                           </span>
-                          <span className="text-slate-500">
+                          <span className="text-zinc-600 font-mono">
                             {totalVotes} voted
                           </span>
-                          <span className="text-red-400 font-semibold flex items-center gap-1">
+                          <span className="text-red-400 font-mono font-semibold flex items-center gap-1">
                             {noVotes} No ({noPercent}%){" "}
-                            <ThumbsDown className="w-3 h-3" />
+                            <ThumbsDown className="w-2.5 h-2.5" />
                           </span>
                         </div>
                       </div>
@@ -541,17 +546,8 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                     {/* Voting ended */}
                     {votingEnded && !info.fundsReleased && (
                       <div className="space-y-3">
-                        <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-slate-800">
-                          <div
-                            className="bg-emerald-500"
-                            style={{ width: `${yesPercent}%` }}
-                          />
-                          <div
-                            className="bg-red-500/70"
-                            style={{ width: `${noPercent}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between text-xs">
+                        <VoteBar yes={yesPercent} no={noPercent} />
+                        <div className="flex justify-between text-[11px] font-mono">
                           <span className="text-emerald-400 font-semibold">
                             {yesVotes} Yes ({yesPercent}%)
                           </span>
@@ -561,18 +557,18 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                         </div>
                         {canRelease ? (
                           <>
-                            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                              Majority approved! You can now release funds.
+                            <div className="flex items-center gap-2 text-emerald-400 text-[11px] font-bold bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-3">
+                              <CheckCircle2 className="w-3 h-3 shrink-0" />
+                              Majority approved — funds ready to release
                             </div>
                             <button
                               onClick={() => doReleaseFunds(campaign.address)}
                               disabled={rAction?.loading || rAction?.done}
-                              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                              className="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed font-black py-2.5 rounded-xl text-xs transition-all active:scale-95"
                             >
                               {rAction?.loading ? (
                                 <>
-                                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  <Spinner color="border-t-zinc-800" />
                                   Releasing...
                                 </>
                               ) : rAction?.done ? (
@@ -588,24 +584,23 @@ function FounderDashboard({ wallet }: { wallet: string }): JSX.Element {
                               )}
                             </button>
                             {rAction?.error && (
-                              <p className="text-xs text-red-400">
+                              <p className="text-[11px] text-red-400">
                                 {rAction.error}
                               </p>
                             )}
                           </>
                         ) : (
-                          <div className="flex items-center gap-2 text-red-400 text-xs font-bold bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            Majority rejected — funds cannot be released.
+                          <div className="flex items-center gap-2 text-red-400 text-[11px] font-bold bg-red-500/5 border border-red-500/15 rounded-xl p-3">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            Majority rejected — funds cannot be released
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Already released */}
                     {info.fundsReleased && (
-                      <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <div className="flex items-center gap-2 text-emerald-400 text-[11px] font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         Funds successfully released to your wallet
                       </div>
                     )}
@@ -644,9 +639,8 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
             fetchCampaignInfo(c.address),
             getTokenBalance(c.address, wallet),
           ]);
-          if (tokenBalance > 0n) {
+          if (tokenBalance > 0n)
             results.push({ campaign: c, info, tokenBalance });
-          }
         }),
       );
       setItems(results);
@@ -675,10 +669,10 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
 
   if (loading)
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
+          <p className="text-zinc-500 text-sm">
             Scanning chain for your investments...
           </p>
         </div>
@@ -689,57 +683,47 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          icon={Zap}
-          value={totalTokens}
-          label="Total Tokens"
-          sub="Across campaigns"
-        />
-        <StatCard
-          icon={Vote}
-          value={items.length}
-          label="Positions"
-          sub="Campaigns backed"
-        />
-        <StatCard
-          icon={TrendingUp}
-          value={items.filter((i) => i.info.goalReached).length}
-          label="Funded"
-          sub="Goal reached"
-        />
-        <StatCard
-          icon={Shield}
-          value={items.filter((i) => i.info.fundsReleased).length}
-          label="Released"
-          sub="Completed"
-        />
-      </div>
+      <CommandStrip
+        stats={[
+          { icon: Zap, value: fmtTokens(totalTokens), label: "Total Tokens" },
+          { icon: Vote, value: items.length, label: "Positions" },
+          {
+            icon: TrendingUp,
+            value: items.filter((i) => i.info.goalReached).length,
+            label: "Funded",
+          },
+          {
+            icon: Shield,
+            value: items.filter((i) => i.info.fundsReleased).length,
+            label: "Released",
+          },
+        ]}
+      />
 
       <div>
-        <div className="flex items-center justify-between mb-4 sm:mb-5">
-          <h2 className="text-lg sm:text-xl font-black text-white">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-white tracking-tight">
             Your Portfolio
           </h2>
           <button
             onClick={load}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="text-zinc-600 hover:text-zinc-300 transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {items.length === 0 ? (
-          <div className="glass-card rounded-3xl p-12 text-center">
-            <Wallet className="w-10 h-10 text-slate-600 mx-auto mb-4" />
-            <p className="text-slate-400 mb-4">
+          <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-12 text-center">
+            <Wallet className="w-8 h-8 text-zinc-700 mx-auto mb-4" />
+            <p className="text-zinc-500 text-sm mb-5">
               No investments found for this wallet.
             </p>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition-all text-sm"
+              className="inline-flex items-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400 text-white font-bold px-5 py-2.5 rounded-xl transition-all text-sm"
             >
-              <Eye className="w-4 h-4" /> Explore Campaigns
+              <Eye className="w-3.5 h-3.5 text-emerald-400" /> Explore Campaigns
             </Link>
           </div>
         ) : (
@@ -759,104 +743,98 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
               return (
                 <div
                   key={campaign.address}
-                  className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-6 space-y-4 sm:space-y-5"
+                  className="bg-zinc-900/40 border border-white/[0.05] hover:border-emerald-500/20 backdrop-blur-xl rounded-2xl p-5 sm:p-6 space-y-5 transition-all duration-300 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span
-                          className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${statusBadge[status]}`}
-                        >
-                          {status === "funded" && !info.fundsReleased
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <StatusBadge
+                        status={status}
+                        label={
+                          status === "funded" && !info.fundsReleased
                             ? "Vote Needed"
-                            : statusLabel[status]}
-                        </span>
-                      </div>
-                      <h3 className="text-white font-black text-base sm:text-lg line-clamp-1">
+                            : undefined
+                        }
+                      />
+                      <h3 className="text-white font-bold text-base line-clamp-1 tracking-tight">
                         {info.title}
                       </h3>
                     </div>
                     <Link
                       to={`/campaign/${campaign.address}`}
-                      className="shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-400 transition-colors font-medium bg-slate-800/50 px-2.5 py-1.5 rounded-lg"
+                      className="shrink-0 flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-emerald-400 transition-colors font-medium bg-white/[0.03] border border-white/[0.05] px-2.5 py-1.5 rounded-lg"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3 h-3" />
                       <span className="hidden sm:inline">View</span>
                     </Link>
                   </div>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    <div className="bg-slate-800/30 rounded-xl p-2.5 sm:p-3 text-center">
-                      <div className="text-emerald-400 font-black font-mono text-sm sm:text-base">
-                        {tokens}
+                  {/* Stat grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { val: fmtTokens(tokens), label: "Tokens" },
+                      { val: `${share}%`, label: "Share" },
+                      { val: `${Math.round(progress)}%`, label: "Funded" },
+                    ].map(({ val, label }) => (
+                      <div
+                        key={label}
+                        className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-3 text-center"
+                      >
+                        <div className="font-mono text-sm font-bold text-white">
+                          {val}
+                        </div>
+                        <div className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-widest">
+                          {label}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        Tokens
-                      </div>
-                    </div>
-                    <div className="bg-slate-800/30 rounded-xl p-2.5 sm:p-3 text-center">
-                      <div className="text-white font-black text-sm sm:text-base">
-                        {share}%
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">Share</div>
-                    </div>
-                    <div className="bg-slate-800/30 rounded-xl p-2.5 sm:p-3 text-center">
-                      <div className="text-white font-black text-sm sm:text-base">
-                        {Math.round(progress)}%
-                      </div>
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        Funded
-                      </div>
-                    </div>
+                    ))}
                   </div>
 
                   {/* Progress */}
-                  <div>
-                    <div className="flex justify-between items-baseline mb-2">
-                      <span className="text-xs sm:text-sm text-slate-400">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[11px] text-zinc-500">
                         Campaign Progress
                       </span>
-                      <span className="text-slate-400 text-xs">
+                      <span className="font-mono text-[11px] text-zinc-500">
                         {raised.toFixed(4)} / {goal} ETH
                       </span>
                     </div>
                     <ProgressBar value={progress} />
                   </div>
 
-                  {/* Voting */}
-                  <div className="bg-slate-800/30 rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/5 space-y-3">
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                  {/* Voting zone */}
+                  <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-4 space-y-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">
                       Milestone Vote
                     </span>
-                    <p className="text-slate-300 text-xs sm:text-sm line-clamp-2">
+                    <p className="text-zinc-500 text-xs line-clamp-2 leading-relaxed">
                       {info.milestoneDescription}
                     </p>
 
                     {info.goalReached && !info.fundsReleased && !hasVoted && (
-                      <div className="flex gap-2 sm:gap-3 pt-1">
+                      <div className="flex gap-2 pt-1">
                         <button
                           onClick={() => doVote(campaign.address, true)}
                           disabled={isVoteLoading}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold py-2.5 rounded-xl text-xs sm:text-sm transition-all active:scale-95 disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50 hover:shadow-[0_0_12px_rgba(16,185,129,0.15)]"
                         >
                           {isVoteLoading ? (
-                            <div className="w-3.5 h-3.5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                            <Spinner color="border-t-emerald-400" />
                           ) : (
-                            <ThumbsUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <ThumbsUp className="w-3.5 h-3.5" />
                           )}
                           Approve
                         </button>
                         <button
                           onClick={() => doVote(campaign.address, false)}
                           disabled={isVoteLoading}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold py-2.5 rounded-xl text-xs sm:text-sm transition-all active:scale-95 disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-bold py-2.5 rounded-xl text-xs transition-all active:scale-95 disabled:opacity-50 hover:shadow-[0_0_12px_rgba(239,68,68,0.15)]"
                         >
                           {isVoteLoading ? (
-                            <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                            <Spinner color="border-t-red-400" />
                           ) : (
-                            <ThumbsDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <ThumbsDown className="w-3.5 h-3.5" />
                           )}
                           Reject
                         </button>
@@ -865,16 +843,16 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
 
                     {hasVoted && (
                       <div
-                        className={`flex items-center gap-2 p-3 rounded-xl text-xs sm:text-sm font-bold border ${
+                        className={`flex items-center gap-2 p-3 rounded-xl text-xs font-bold border ${
                           hasVoted === "yes"
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                            : "bg-red-500/10 border-red-500/20 text-red-400"
+                            ? "bg-emerald-500/5 border-emerald-500/15 text-emerald-400"
+                            : "bg-red-500/5 border-red-500/15 text-red-400"
                         }`}
                       >
                         {hasVoted === "yes" ? (
-                          <ThumbsUp className="w-4 h-4 shrink-0" />
+                          <ThumbsUp className="w-3.5 h-3.5 shrink-0" />
                         ) : (
-                          <ThumbsDown className="w-4 h-4 shrink-0" />
+                          <ThumbsDown className="w-3.5 h-3.5 shrink-0" />
                         )}
                         Voted {hasVoted === "yes" ? "to Approve" : "to Reject"}{" "}
                         — on-chain ✓
@@ -882,16 +860,16 @@ function InvestorDashboard({ wallet }: { wallet: string }): JSX.Element {
                     )}
 
                     {info.fundsReleased && (
-                      <div className="flex items-center gap-2 text-emerald-400 text-xs sm:text-sm font-bold">
-                        <CheckCircle2 className="w-4 h-4 shrink-0" /> Funds
+                      <div className="flex items-center gap-2 text-emerald-400 text-[11px] font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Funds
                         released to founder
                       </div>
                     )}
 
                     {!info.goalReached && (
-                      <div className="flex items-center gap-2 text-slate-500 text-xs">
-                        <Clock className="w-3.5 h-3.5 shrink-0" /> Waiting for
-                        goal to be reached
+                      <div className="flex items-center gap-2 text-zinc-600 text-[11px]">
+                        <Clock className="w-3 h-3 shrink-0" /> Waiting for goal
+                        to be reached
                       </div>
                     )}
                   </div>
@@ -931,73 +909,77 @@ export default function Dashboard(): JSX.Element {
   ];
 
   return (
-    <div className="min-h-screen pb-24 relative">
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[400px] sm:w-[600px] h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-zinc-950 pb-24 relative overflow-hidden">
+      {/* Background orb */}
+      <div className="fixed top-1/3 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-emerald-500/[0.03] rounded-full blur-[150px] pointer-events-none" />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 relative z-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 relative z-10">
+        {/* Page header */}
         <div className="mb-8 sm:mb-10">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 sm:px-4 py-1.5 rounded-full mb-4 uppercase tracking-widest">
-            <BarChart3 className="w-3.5 h-3.5" /> Dashboard
+          <div className="inline-flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] text-zinc-500 text-[10px] font-bold px-3 py-1.5 rounded-full mb-5 uppercase tracking-[0.15em]">
+            <BarChart3 className="w-3 h-3" /> Dashboard
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tighter mb-3">
             My Dashboard
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base">
-            {wallet ? (
-              <span className="flex items-center gap-2 flex-wrap">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shrink-0" />
-                Connected as{" "}
-                <span className="text-emerald-400 font-mono font-bold break-all">
-                  {shortAddress}
-                </span>
+          {wallet ? (
+            <div className="inline-flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] px-3 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse shrink-0" />
+              <span className="text-zinc-500 text-xs font-mono">
+                {shortAddress}
               </span>
-            ) : (
-              "Connect your wallet to view your portfolio."
-            )}
-          </p>
+            </div>
+          ) : (
+            <p className="text-zinc-600 text-sm">
+              Connect your wallet to view your portfolio.
+            </p>
+          )}
         </div>
 
+        {/* No wallet */}
         {!wallet ? (
-          <div className="glass-card rounded-3xl p-8 sm:p-16 text-center">
-            <div className="relative inline-flex mb-6">
+          <div className="bg-white/[0.02] border border-white/[0.05] backdrop-blur-2xl rounded-2xl p-12 sm:p-20 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]">
+            <div className="relative inline-flex mb-8">
               <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full" />
-              <div className="relative bg-emerald-500/10 border border-emerald-500/20 p-4 sm:p-5 rounded-2xl">
-                <Zap className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400" />
+              <div className="relative bg-white/[0.04] border border-white/[0.08] p-5 rounded-2xl">
+                <Zap className="w-9 h-9 text-emerald-400" />
               </div>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white mb-3">
+            <h2 className="text-xl font-black text-white mb-3 tracking-tight">
               Wallet Not Connected
             </h2>
-            <p className="text-slate-400 mb-8 max-w-sm mx-auto leading-relaxed text-sm sm:text-base">
+            <p className="text-zinc-500 mb-8 max-w-sm mx-auto leading-relaxed text-sm">
               Connect your wallet to view your investments, vote on milestones,
               and manage your campaigns.
             </p>
             <button
               onClick={connectWallet}
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 sm:px-8 py-3 sm:py-4 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-900/40 text-sm sm:text-base"
+              className="inline-flex items-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400 text-white font-bold px-7 py-3.5 rounded-xl transition-all active:scale-95 text-sm shadow-[0_0_20px_rgba(16,185,129,0.12)]"
             >
-              <Zap className="w-4 h-4" /> Connect Wallet
+              <Zap className="w-4 h-4 text-emerald-400" /> Connect Wallet
             </button>
           </div>
         ) : (
           <>
-            <div className="flex gap-2 mb-6 sm:mb-8 bg-slate-900/50 border border-slate-800 p-1 rounded-2xl w-full sm:w-fit">
+            {/* Segmented control */}
+            <div className="bg-zinc-900/50 border border-white/[0.05] p-1 rounded-xl inline-flex mb-7 sm:mb-8">
               {tabs.map(({ id, label, labelFull, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setTab(id)}
-                  className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 ${
+                  className={`flex items-center gap-2 px-4 sm:px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                     tab === id
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"
-                      : "text-slate-400 hover:text-white"
+                      ? "bg-zinc-800 text-white shadow-sm shadow-black/20"
+                      : "text-zinc-500 hover:text-zinc-300"
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className="w-3.5 h-3.5 shrink-0" />
                   <span className="sm:hidden">{label}</span>
                   <span className="hidden sm:inline">{labelFull}</span>
                 </button>
               ))}
             </div>
+
             {tab === "founder" ? (
               <FounderDashboard wallet={wallet!} />
             ) : (

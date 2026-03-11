@@ -12,15 +12,17 @@ export default function App() {
   return (
     <WalletProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-[#020617] text-white">
+        <div className="min-h-screen bg-zinc-950 text-white">
           <Navbar />
           <WalletModal />
-          <main className="pt-16">
+          <main>
+            {" "}
+            {/* no pt-16 — Navbar now injects its own h-20 spacer */}
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/campaign/:id" element={<CampaignDetails />} />
               <Route path="/create" element={<CreateCampaign />} />
-              {<Route path="/dashboard" element={<Dashboard />} /> }
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>

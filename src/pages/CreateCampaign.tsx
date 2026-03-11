@@ -13,12 +13,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createCampaign } from "../hooks/useCampaign";
+
 interface Step {
   id: number;
   label: string;
   icon: LucideIcon;
 }
-
 interface FormState {
   title: string;
   description: string;
@@ -28,7 +28,6 @@ interface FormState {
   milestoneDescription: string;
   tokenSymbol: string;
 }
-
 interface FormErrors {
   title?: string;
   description?: string;
@@ -38,22 +37,20 @@ interface FormErrors {
   milestoneDescription?: string;
   tokenSymbol?: string;
 }
-
 interface StepIndicatorProps {
   current: number;
 }
-
 interface InputFieldProps {
   label: string;
   hint?: string;
   error?: string;
   children: React.ReactNode;
 }
-
 interface ReviewRowProps {
   label: string;
   value: string;
   highlight?: boolean;
+  mono?: boolean;
 }
 
 const categories: string[] = [
@@ -74,60 +71,66 @@ const steps: Step[] = [
   { id: 4, label: "Review", icon: Eye },
 ];
 
+// ── Step Indicator — Vercel pipeline style ────────────────────────────────────
 function StepIndicator({ current }: StepIndicatorProps): JSX.Element {
   return (
-    <div className="flex items-center justify-center mb-8 sm:mb-12">
+    <div className="flex items-center justify-center mb-10 sm:mb-12 px-2">
       {steps.map((step, i) => {
-        const Icon = step.icon;
         const done = current > step.id;
         const active = current === step.id;
         return (
           <div key={step.id} className="flex items-center">
-            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
-              <div
-                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-300 border ${
-                  done
-                    ? "bg-emerald-500 border-emerald-500 text-white"
-                    : active
-                      ? "bg-emerald-500/10 border-emerald-500 text-emerald-400"
-                      : "bg-slate-800/50 border-slate-700 text-slate-500"
-                }`}
-              >
+            <div className="flex flex-col items-center gap-2">
+              {/* Node */}
+              <div className="relative flex items-center justify-center w-6 h-6">
                 {done ? (
-                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                    <CheckCircle2
+                      className="w-3 h-3 text-white"
+                      strokeWidth={3}
+                    />
+                  </div>
+                ) : active ? (
+                  <>
+                    <div className="absolute w-6 h-6 rounded-full bg-emerald-500/20 animate-ping" />
+                    <div className="relative w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-500/25" />
+                  </>
                 ) : (
-                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <div className="w-2 h-2 rounded-full bg-zinc-700" />
                 )}
               </div>
+              {/* Label */}
               <span
-                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider hidden sm:block ${
+                className={`text-[9px] font-bold uppercase tracking-[0.15em] hidden sm:block ${
                   active
                     ? "text-emerald-400"
                     : done
-                      ? "text-slate-300"
-                      : "text-slate-600"
+                      ? "text-zinc-400"
+                      : "text-zinc-700"
                 }`}
               >
                 {step.label}
               </span>
               <span
-                className={`text-[10px] font-bold sm:hidden ${
+                className={`text-[9px] font-bold sm:hidden ${
                   active
                     ? "text-emerald-400"
                     : done
-                      ? "text-slate-300"
-                      : "text-slate-600"
+                      ? "text-zinc-400"
+                      : "text-zinc-700"
                 }`}
               >
                 {step.id}
               </span>
             </div>
+            {/* Track segment */}
             {i < steps.length - 1 && (
-              <div
-                className={`w-8 sm:w-24 h-px mx-1.5 sm:mx-2 mb-4 sm:mb-5 transition-all duration-500 ${
-                  current > step.id ? "bg-emerald-500" : "bg-slate-700"
-                }`}
-              />
+              <div className="w-12 sm:w-28 h-[2px] mx-2 mb-4 sm:mb-5 overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: current > step.id ? "100%" : "0%" }}
+                />
+              </div>
             )}
           </div>
         );
@@ -136,6 +139,7 @@ function StepIndicator({ current }: StepIndicatorProps): JSX.Element {
   );
 }
 
+// ── Input Field ───────────────────────────────────────────────────────────────
 function InputField({
   label,
   hint,
@@ -145,35 +149,39 @@ function InputField({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.15em]">
           {label}
         </label>
-        {hint && <span className="text-xs text-slate-600">{hint}</span>}
+        {hint && (
+          <span className="text-[10px] text-zinc-700 font-mono">{hint}</span>
+        )}
       </div>
       {children}
       {error && (
-        <div className="flex items-center gap-1.5 text-red-400 text-xs">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
+        <div className="flex items-center gap-1.5 text-red-400 text-[11px]">
+          <AlertCircle className="w-3 h-3 shrink-0" /> {error}
         </div>
       )}
     </div>
   );
 }
 
+// ── Review Row ────────────────────────────────────────────────────────────────
 function ReviewRow({
   label,
   value,
   highlight = false,
+  mono = false,
 }: ReviewRowProps): JSX.Element {
   return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b border-white/5 last:border-0">
-      <span className="text-slate-400 text-xs sm:text-sm shrink-0">
+    <div className="flex items-start justify-between gap-4 py-3 border-b border-dashed border-white/[0.06] last:border-0">
+      <span className="text-zinc-500 text-[11px] uppercase tracking-widest font-bold shrink-0">
         {label}
       </span>
       <span
-        className={`text-xs sm:text-sm font-bold text-right break-words max-w-[60%] ${
-          highlight ? "text-emerald-400" : "text-white"
-        }`}
+        className={`text-xs text-right break-words max-w-[60%] font-bold ${
+          mono ? "font-mono" : ""
+        } ${highlight ? "text-emerald-400" : "text-white"}`}
       >
         {value}
       </span>
@@ -181,6 +189,13 @@ function ReviewRow({
   );
 }
 
+// ── Shared input className builders ──────────────────────────────────────────
+const inputBase =
+  "w-full bg-white/[0.03] border border-transparent text-white placeholder-zinc-700 px-4 py-3 rounded-xl focus:outline-none focus:bg-white/[0.05] focus:border-emerald-500/30 focus:ring-1 focus:ring-emerald-500/30 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all duration-200 text-sm";
+const inputError =
+  "border-red-500/30 focus:border-red-500/50 focus:ring-red-500/20 focus:shadow-none";
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function CreateCampaign(): JSX.Element {
   const navigate = useNavigate();
   const [step, setStep] = useState<number>(1);
@@ -239,6 +254,7 @@ export default function CreateCampaign(): JSX.Element {
     if (validateStep()) setStep((s) => s + 1);
   };
   const back = () => setStep((s) => s - 1);
+
   const handleSubmit = async () => {
     try {
       setDeploying(true);
@@ -254,11 +270,9 @@ export default function CreateCampaign(): JSX.Element {
       setDeployedAddress(address);
       setSubmitted(true);
     } catch (err: any) {
-      if (err.message.includes("user rejected")) {
+      if (err.message.includes("user rejected"))
         setDeployError("Transaction rejected.");
-      } else {
-        setDeployError(err.message.slice(0, 120));
-      }
+      else setDeployError(err.message.slice(0, 120));
     } finally {
       setDeploying(false);
     }
@@ -268,45 +282,63 @@ export default function CreateCampaign(): JSX.Element {
   minDate.setDate(minDate.getDate() + 1);
   const minDateStr = minDate.toISOString().split("T")[0];
 
+  // ── Success State ─────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md w-full">
-          <div className="relative inline-flex mb-6 sm:mb-8">
-            <div className="absolute inset-0 bg-emerald-500/20 blur-2xl rounded-full" />
-            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-400" />
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4 py-16 relative overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[160px]" />
+        </div>
+        <div className="relative z-10 text-center max-w-md w-full">
+          {/* Shield / glow */}
+          <div className="relative inline-flex mb-8">
+            <div className="absolute inset-0 bg-emerald-500/30 blur-3xl rounded-full" />
+            <div className="relative w-24 h-24 rounded-full bg-emerald-500/10 border border-emerald-500/30 ring-8 ring-emerald-500/[0.08] flex items-center justify-center">
+              <CheckCircle2
+                className="w-12 h-12 text-emerald-400"
+                strokeWidth={1.5}
+              />
             </div>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">
-            Campaign Submitted!
+
+          <div className="inline-flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/15 text-emerald-500 text-[10px] font-bold px-3 py-1.5 rounded-full mb-5 uppercase tracking-[0.15em]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Contract Deployed
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tighter mb-3">
+            Campaign Live.
           </h2>
-          <p className="text-slate-400 leading-relaxed mb-2 text-sm sm:text-base px-4">
-            <span className="text-emerald-400 font-bold">"{form.title}"</span>{" "}
-            has been created.
+          <p className="text-zinc-500 leading-relaxed mb-6 text-sm">
+            <span className="text-white font-semibold">"{form.title}"</span> has
+            been deployed to the chain.
           </p>
+
           {deployedAddress && (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 mb-4 mx-4">
-              <p className="text-xs text-slate-500 mb-1">Contract Deployed</p>
-              <p className="text-xs font-mono text-emerald-400 break-all">
+            <div className="bg-black border border-white/[0.08] rounded-xl p-4 mb-6 text-left space-y-2">
+              <p className="text-[10px] text-zinc-600 uppercase tracking-widest font-bold">
+                Contract Address
+              </p>
+              <p className="text-emerald-400 font-mono text-xs break-all leading-relaxed">
                 {deployedAddress}
               </p>
               <a
                 href={`https://dashboard.tenderly.co/contract/${deployedAddress}`}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-slate-400 hover:text-emerald-400 mt-1 inline-block"
+                className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-emerald-400 transition-colors mt-1"
               >
-                View on Tenderly →
+                View on Tenderly <ArrowRight className="w-2.5 h-2.5" />
               </a>
             </div>
           )}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center px-4">
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => navigate("/")}
-              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-sm"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-sm shadow-[0_0_16px_rgba(16,185,129,0.1)] hover:shadow-[0_0_24px_rgba(16,185,129,0.2)]"
             >
-              Explore Campaigns
+              <Eye className="w-3.5 h-3.5 text-emerald-400" /> Explore Campaigns
             </button>
             <button
               onClick={() => {
@@ -322,7 +354,7 @@ export default function CreateCampaign(): JSX.Element {
                   tokenSymbol: "",
                 });
               }}
-              className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-sm"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] text-zinc-300 font-bold px-6 py-3 rounded-xl transition-all active:scale-95 text-sm"
             >
               Create Another
             </button>
@@ -332,34 +364,38 @@ export default function CreateCampaign(): JSX.Element {
     );
   }
 
+  // ── Main Form ─────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen pb-24 relative">
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[300px] sm:w-[600px] h-[200px] sm:h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen bg-zinc-950 pb-24 relative overflow-hidden">
+      {/* Background orb */}
+      <div className="absolute top-32 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-emerald-500/[0.07] rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 relative z-10">
-        <div className="text-center mb-6 sm:mb-10">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 sm:px-4 py-1.5 rounded-full mb-4 sm:mb-5 uppercase tracking-widest">
-            <Zap className="w-3.5 h-3.5" /> New Campaign
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-10 sm:pt-14 relative z-10">
+        {/* Page header */}
+        <div className="text-center mb-8 sm:mb-10">
+          <div className="inline-flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] text-zinc-500 text-[10px] font-bold px-3 py-1.5 rounded-full mb-5 uppercase tracking-[0.15em]">
+            <Zap className="w-3 h-3 text-emerald-500" /> New Campaign
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tighter mb-2">
             Launch Your Project
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base">
-            Fill in the details below to create your funding campaign.
+          <p className="text-zinc-500 text-sm">
+            Fill in the details below to deploy your funding campaign on-chain.
           </p>
         </div>
 
         <StepIndicator current={step} />
 
-        <div className="glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-8">
-          {/* STEP 1 */}
+        {/* Form Card */}
+        <div className="bg-white/[0.02] border border-white/[0.05] backdrop-blur-2xl rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_0_rgba(255,255,255,0.03)] p-6 sm:p-8">
+          {/* ── STEP 1 ── */}
           {step === 1 && (
-            <div className="space-y-5 sm:space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-white mb-1">
+                <h2 className="text-lg font-black text-white tracking-tight mb-1">
                   Basic Information
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-sm">
+                <p className="text-zinc-600 text-xs">
                   Tell investors what your project is about.
                 </p>
               </div>
@@ -372,11 +408,7 @@ export default function CreateCampaign(): JSX.Element {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     set("title", e.target.value)
                   }
-                  className={`w-full bg-slate-800/50 border text-white placeholder-slate-600 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm ${
-                    errors.title
-                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                      : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                  }`}
+                  className={`${inputBase} ${errors.title ? inputError : ""}`}
                 />
               </InputField>
 
@@ -392,11 +424,7 @@ export default function CreateCampaign(): JSX.Element {
                     set("description", e.target.value.slice(0, 500))
                   }
                   rows={4}
-                  className={`w-full bg-slate-800/50 border text-white placeholder-slate-600 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm resize-none ${
-                    errors.description
-                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                      : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                  }`}
+                  className={`${inputBase} resize-none ${errors.description ? inputError : ""}`}
                 />
               </InputField>
 
@@ -406,10 +434,10 @@ export default function CreateCampaign(): JSX.Element {
                     <button
                       key={cat}
                       onClick={() => set("category", cat)}
-                      className={`py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl text-xs font-bold border transition-all ${
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all duration-150 ${
                         form.category === cat
-                          ? "bg-emerald-500/10 border-emerald-500/50 text-emerald-400"
-                          : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]"
+                          : "bg-white/[0.02] border-white/[0.05] text-zinc-500 hover:bg-white/[0.05] hover:text-white"
                       }`}
                     >
                       {cat}
@@ -417,8 +445,8 @@ export default function CreateCampaign(): JSX.Element {
                   ))}
                 </div>
                 {errors.category && (
-                  <div className="flex items-center gap-1.5 text-red-400 text-xs mt-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />{" "}
+                  <div className="flex items-center gap-1.5 text-red-400 text-[11px] mt-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />{" "}
                     {errors.category}
                   </div>
                 )}
@@ -426,14 +454,14 @@ export default function CreateCampaign(): JSX.Element {
             </div>
           )}
 
-          {/* STEP 2 */}
+          {/* ── STEP 2 ── */}
           {step === 2 && (
-            <div className="space-y-5 sm:space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-white mb-1">
+                <h2 className="text-lg font-black text-white tracking-tight mb-1">
                   Funding Details
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-sm">
+                <p className="text-zinc-600 text-xs">
                   Set your goal and campaign deadline.
                 </p>
               </div>
@@ -449,25 +477,21 @@ export default function CreateCampaign(): JSX.Element {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       set("goal", e.target.value)
                     }
-                    className={`w-full bg-slate-800/50 border text-white placeholder-slate-600 px-3 sm:px-4 py-2.5 sm:py-3 pr-14 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm ${
-                      errors.goal
-                        ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                        : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                    }`}
+                    className={`${inputBase} pr-14 font-mono ${errors.goal ? inputError : ""}`}
                   />
-                  <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 font-mono font-bold text-xs">
                     ETH
                   </span>
                 </div>
-                <div className="flex gap-2 mt-2 overflow-x-auto pb-1 no-scrollbar">
+                <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
                   {["1", "5", "10", "50", "100"].map((v: string) => (
                     <button
                       key={v}
                       onClick={() => set("goal", v)}
-                      className={`shrink-0 flex-1 min-w-[48px] text-xs font-bold py-1.5 rounded-lg border transition-all ${
+                      className={`shrink-0 flex-1 min-w-[44px] text-xs font-mono font-bold py-1.5 rounded-lg border transition-all ${
                         form.goal === v
                           ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                          : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+                          : "bg-white/[0.02] border-white/[0.05] text-zinc-600 hover:text-white hover:bg-white/[0.05]"
                       }`}
                     >
                       {v}
@@ -484,43 +508,36 @@ export default function CreateCampaign(): JSX.Element {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     set("deadline", e.target.value)
                   }
-                  className={`w-full bg-slate-800/50 border text-white px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm ${
-                    errors.deadline
-                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                      : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                  }`}
+                  className={`${inputBase} font-mono ${errors.deadline ? inputError : ""}`}
                 />
               </InputField>
 
               {form.goal && (
-                <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-5 space-y-2.5 sm:space-y-3">
-                  <h4 className="text-xs font-black text-emerald-400 uppercase tracking-wider">
+                <div className="bg-black/40 border border-white/[0.06] rounded-xl p-4 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">
                     Token Preview
-                  </h4>
+                  </p>
                   {[
                     {
-                      label: "Total token supply",
+                      label: "Total supply",
                       value: "10,000 tokens",
-                      highlight: false,
+                      em: false,
                     },
                     {
                       label: "Price per token",
                       value: `${(parseFloat(form.goal) / 10000).toFixed(4)} ETH`,
-                      highlight: false,
+                      em: false,
                     },
                     {
-                      label: "1 ETH investment gets",
+                      label: "1 ETH investment →",
                       value: `${Math.floor(10000 / parseFloat(form.goal))} tokens`,
-                      highlight: true,
+                      em: true,
                     },
                   ].map((row, i) => (
-                    <div
-                      key={i}
-                      className="flex justify-between items-center text-xs sm:text-sm"
-                    >
-                      <span className="text-slate-400">{row.label}</span>
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-zinc-600 text-xs">{row.label}</span>
                       <span
-                        className={`font-bold ${row.highlight ? "text-emerald-400" : "text-white"}`}
+                        className={`font-mono text-xs font-bold ${row.em ? "text-emerald-400" : "text-white"}`}
                       >
                         {row.value}
                       </span>
@@ -531,21 +548,21 @@ export default function CreateCampaign(): JSX.Element {
             </div>
           )}
 
-          {/* STEP 3 */}
+          {/* ── STEP 3 ── */}
           {step === 3 && (
-            <div className="space-y-5 sm:space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
               <div>
-                <h2 className="text-lg sm:text-xl font-black text-white mb-1">
+                <h2 className="text-lg font-black text-white tracking-tight mb-1">
                   Milestone & Token
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-sm">
+                <p className="text-zinc-600 text-xs">
                   Define what investors are voting to approve.
                 </p>
               </div>
 
-              <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-start gap-3">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-400 leading-relaxed">
+              <div className="bg-black/40 border border-amber-500/[0.15] rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500/80 shrink-0 mt-0.5" />
+                <p className="text-xs text-zinc-500 leading-relaxed">
                   Investors will vote on this milestone before funds are
                   released. Make it specific and verifiable.
                 </p>
@@ -563,11 +580,7 @@ export default function CreateCampaign(): JSX.Element {
                     set("milestoneDescription", e.target.value.slice(0, 300))
                   }
                   rows={4}
-                  className={`w-full bg-slate-800/50 border text-white placeholder-slate-600 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm resize-none ${
-                    errors.milestoneDescription
-                      ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                      : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                  }`}
+                  className={`${inputBase} resize-none ${errors.milestoneDescription ? inputError : ""}`}
                 />
               </InputField>
 
@@ -587,15 +600,11 @@ export default function CreateCampaign(): JSX.Element {
                         e.target.value.toUpperCase().slice(0, 5),
                       )
                     }
-                    className={`w-full bg-slate-800/50 border text-white placeholder-slate-600 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl focus:outline-none focus:ring-1 transition-all text-sm font-mono ${
-                      errors.tokenSymbol
-                        ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                        : "border-slate-700 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                    }`}
+                    className={`${inputBase} font-mono ${errors.tokenSymbol ? inputError : ""}`}
                   />
                   {form.tokenSymbol && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-1 rounded-lg">
-                      <Zap className="w-3 h-3" /> {form.tokenSymbol}
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold px-2 py-1 rounded-lg">
+                      <Zap className="w-2.5 h-2.5" /> {form.tokenSymbol}
                     </div>
                   )}
                 </div>
@@ -603,82 +612,121 @@ export default function CreateCampaign(): JSX.Element {
             </div>
           )}
 
-          {/* STEP 4 */}
+          {/* ── STEP 4 ── */}
           {step === 4 && (
             <div className="animate-fade-in">
-              <div className="mb-5 sm:mb-6">
-                <h2 className="text-lg sm:text-xl font-black text-white mb-1">
+              <div className="mb-6">
+                <h2 className="text-lg font-black text-white tracking-tight mb-1">
                   Review & Launch
                 </h2>
-                <p className="text-slate-400 text-xs sm:text-sm">
-                  Double-check everything before deploying.
+                <p className="text-zinc-600 text-xs">
+                  Double-check everything before deploying to chain.
                 </p>
               </div>
 
-              <div className="space-y-3 sm:space-y-4">
-                <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-5">
-                  <h3 className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-3">
-                    Campaign Info
-                  </h3>
-                  <ReviewRow label="Title" value={form.title} />
-                  <ReviewRow label="Category" value={form.category} />
-                  <ReviewRow
-                    label="Description"
-                    value={
-                      form.description.slice(0, 60) +
-                      (form.description.length > 60 ? "..." : "")
-                    }
-                  />
-                </div>
+              <div className="space-y-3">
+                {/* Campaign info block */}
+                {[
+                  {
+                    title: "Campaign Info",
+                    rows: [
+                      {
+                        label: "Title",
+                        value: form.title,
+                        highlight: false,
+                        mono: false,
+                      },
+                      {
+                        label: "Category",
+                        value: form.category,
+                        highlight: false,
+                        mono: false,
+                      },
+                      {
+                        label: "Description",
+                        value:
+                          form.description.slice(0, 60) +
+                          (form.description.length > 60 ? "…" : ""),
+                        highlight: false,
+                        mono: false,
+                      },
+                    ],
+                  },
+                  {
+                    title: "Funding",
+                    rows: [
+                      {
+                        label: "Goal",
+                        value: `${form.goal} ETH`,
+                        highlight: true,
+                        mono: true,
+                      },
+                      {
+                        label: "Deadline",
+                        value: new Date(form.deadline).toLocaleDateString(
+                          "en-US",
+                          { year: "numeric", month: "short", day: "numeric" },
+                        ),
+                        highlight: false,
+                        mono: false,
+                      },
+                      {
+                        label: "Supply",
+                        value: "10,000 tokens",
+                        highlight: false,
+                        mono: true,
+                      },
+                      {
+                        label: "Symbol",
+                        value: form.tokenSymbol,
+                        highlight: true,
+                        mono: true,
+                      },
+                    ],
+                  },
+                  {
+                    title: "Milestone",
+                    rows: [
+                      {
+                        label: "Description",
+                        value:
+                          form.milestoneDescription.slice(0, 80) +
+                          (form.milestoneDescription.length > 80 ? "…" : ""),
+                        highlight: false,
+                        mono: false,
+                      },
+                      {
+                        label: "Release",
+                        value: `${form.goal} ETH`,
+                        highlight: true,
+                        mono: true,
+                      },
+                      {
+                        label: "Threshold",
+                        value: ">50% votes",
+                        highlight: false,
+                        mono: true,
+                      },
+                    ],
+                  },
+                ].map(({ title, rows }) => (
+                  <div
+                    key={title}
+                    className="bg-black/30 border border-white/[0.05] rounded-xl p-4"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600 mb-3">
+                      {title}
+                    </p>
+                    {rows.map((r) => (
+                      <ReviewRow key={r.label} {...r} />
+                    ))}
+                  </div>
+                ))}
 
-                <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-5">
-                  <h3 className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-3">
-                    Funding
-                  </h3>
-                  <ReviewRow
-                    label="Goal"
-                    value={`${form.goal} ETH`}
-                    highlight
-                  />
-                  <ReviewRow
-                    label="Deadline"
-                    value={new Date(form.deadline).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  />
-                  <ReviewRow label="Supply" value="10,000 tokens" />
-                  <ReviewRow
-                    label="Symbol"
-                    value={form.tokenSymbol}
-                    highlight
-                  />
-                </div>
-
-                <div className="glass-card rounded-xl sm:rounded-2xl p-4 sm:p-5">
-                  <h3 className="text-xs font-black text-emerald-400 uppercase tracking-wider mb-3">
-                    Milestone
-                  </h3>
-                  <ReviewRow
-                    label="Description"
-                    value={
-                      form.milestoneDescription.slice(0, 80) +
-                      (form.milestoneDescription.length > 80 ? "..." : "")
-                    }
-                  />
-                  <ReviewRow
-                    label="Release"
-                    value={`${form.goal} ETH`}
-                    highlight
-                  />
-                  <ReviewRow label="Threshold" value=">50% votes" />
-                </div>
-
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    In production, this deploys a smart contract to Polygon.
+                <div className="bg-black/40 border border-amber-500/[0.12] rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500/60 shrink-0 mt-0.5" />
+                  <p className="text-xs text-zinc-600 leading-relaxed">
+                    This deploys a smart contract to the LaunchVault testnet.
                     Funds are locked until investors approve your milestone.
                   </p>
                 </div>
@@ -686,43 +734,66 @@ export default function CreateCampaign(): JSX.Element {
             </div>
           )}
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-white/5">
+          {/* ── Navigation ── */}
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/[0.04]">
             {step > 1 ? (
               <button
                 onClick={back}
-                className="flex items-center gap-2 text-slate-400 hover:text-white font-bold transition-colors text-sm"
+                className="flex items-center gap-2 text-zinc-500 hover:text-white font-bold transition-colors text-sm"
               >
-                <ArrowLeft className="w-4 h-4" /> Back
+                <ArrowLeft className="w-3.5 h-3.5" /> Back
               </button>
             ) : (
               <div />
             )}
+
             {step < 4 ? (
               <button
                 onClick={next}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-900/40 text-sm"
+                className="flex items-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400/80 text-white font-bold px-6 py-2.5 rounded-xl transition-all duration-200 active:scale-95 text-sm shadow-[0_0_16px_rgba(16,185,129,0.1)] hover:shadow-[0_0_24px_rgba(16,185,129,0.2)]"
               >
-                Continue <ArrowRight className="w-4 h-4" />
+                Continue <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
               </button>
             ) : (
               <div className="flex flex-col items-end gap-2">
                 {deployError && (
-                  <p className="text-xs text-red-400">{deployError}</p>
+                  <p className="text-[11px] text-red-400 max-w-xs text-right">
+                    {deployError}
+                  </p>
                 )}
                 <button
                   onClick={handleSubmit}
                   disabled={deploying}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-900/40 text-sm"
+                  className="flex items-center gap-2 bg-zinc-900 ring-1 ring-emerald-500/50 hover:ring-emerald-400/80 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-7 py-2.5 rounded-xl transition-all duration-200 active:scale-95 text-sm shadow-[0_0_16px_rgba(16,185,129,0.12)] hover:shadow-[0_0_28px_rgba(16,185,129,0.25)]"
                 >
                   {deploying ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {/* SVG spinner */}
+                      <svg
+                        className="w-3.5 h-3.5 animate-spin text-emerald-400"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-20"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        />
+                        <path
+                          className="opacity-100"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v3a5 5 0 100 10v3a8 8 0 01-8-8z"
+                        />
+                      </svg>
                       Deploying...
                     </>
                   ) : (
                     <>
-                      <Zap className="w-4 h-4" /> Launch Campaign
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" /> Launch
+                      Campaign
                     </>
                   )}
                 </button>
@@ -731,7 +802,7 @@ export default function CreateCampaign(): JSX.Element {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-600 mt-4 sm:hidden">
+        <p className="text-center text-[10px] text-zinc-700 mt-4 sm:hidden">
           Step {step} of {steps.length}
         </p>
       </div>
