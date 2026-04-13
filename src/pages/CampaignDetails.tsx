@@ -4,6 +4,7 @@ import {
   ArrowLeft, Users, Clock, Shield, TrendingUp, CheckCircle2,
   XCircle, Loader2, RefreshCw, ExternalLink, AlertCircle,
   Bot, Lock, Unlock, Vote, FileUp, SlidersHorizontal, Github,
+  Trash2, File, Image, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { useToast } from "../context/ToastContext";
@@ -67,7 +68,10 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
   const [oracleScore, setOracleScore] = useState(75);
   const [proofGithub, setProofGithub] = useState("");
   const [proofDesc, setProofDesc] = useState("");
-  const [proofSubmitted, setProofSubmitted] = useState(false);
+  const [proofFiles, setProofFiles] = useState<File[]>([]);
+  const [agentStatus, setAgentStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [agentReport, setAgentReport] = useState<Record<string, unknown> | null>(null);
+  const [reportExpanded, setReportExpanded] = useState(false);
   const savedCommit = wallet ? loadCommitRecord(campaign.address, m.index) : null;
   const now = BigInt(Math.floor(Date.now() / 1000));
   const isCurrentMilestone = Number(campaign.currentMilestoneIndex) === m.index;
@@ -176,15 +180,17 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
         {/* FOUNDER: Proof upload panel (when pending + no score yet) */}
         {isFounder && m.state === MilestoneState.Pending && isCurrentMilestone && !m.agentScoreSubmitted && (
           <div className="mb-4 liquid-glass rounded-2xl p-4 border border-white/[0.06] space-y-3">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2">
               <FileUp className="w-3.5 h-3.5 text-white/40" />
               <span className="text-white/55 font-body font-medium text-sm">Submit Proof for AI Review</span>
             </div>
-            <p className="text-white/30 font-body text-xs leading-relaxed">
-              Provide evidence for this milestone. The AI oracle will analyze your submission and write a verification score on-chain before voting can begin.
+            <p className="text-white/25 font-body text-xs leading-relaxed">
+              Upload documents (PDF/JPG/PNG/WEBP) and/or a GitHub repo. The AI agents will analyze them and write a verification score on-chain.
             </p>
-            {!proofSubmitted ? (
+
+            {agentStatus === "idle" && (
               <>
+                {/* GitHub URL */}
                 <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
                   <Github className="w-3.5 h-3.5 text-white/30 shrink-0" />
                   <input
@@ -195,32 +201,199 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
                     className="flex-1 bg-transparent text-white text-xs font-body placeholder-white/20 outline-none"
                   />
                 </div>
+
+                {/* Description */}
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder="Describe what you accomplished for this milestone…"
                   value={proofDesc}
                   onChange={(e) => setProofDesc(e.target.value)}
                   className="w-full liquid-glass rounded-xl px-3 py-2.5 text-xs font-body text-white placeholder-white/20 outline-none bg-transparent border border-white/[0.04] resize-none"
                 />
+
+                {/* File drop zone */}
+                <label className="block cursor-pointer">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const incoming = Array.from(e.target.files ?? []);
+                      setProofFiles((prev) => {
+                        const names = new Set(prev.map((f) => f.name));
+                        return [...prev, ...incoming.filter((f) => !names.has(f.name))];
+                      });
+                    }}
+                  />
+                  <div className="flex items-center justify-center gap-2 border border-dashed border-white/10 rounded-xl py-3 hover:border-white/25 transition-colors">
+                    <FileUp className="w-3.5 h-3.5 text-white/20" />
+                    <span className="text-white/30 font-body text-xs">
+                      {proofFiles.length > 0 ? "Add more files" : "Click to upload — PDF, JPG, PNG, WEBP"}
+                    </span>
+                  </div>
+                </label>
+
+                {/* File list */}
+                {proofFiles.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {proofFiles.map((f, i) => {
+                      const isImage = f.type.startsWith("image/");
+                      return (
+                        <li key={i} className="flex items-center gap-2 liquid-glass rounded-lg px-3 py-2 border border-white/[0.04]">
+                          {isImage
+                            ? <Image className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                            : <File className="w-3.5 h-3.5 text-white/30 shrink-0" />}
+                          <span className="text-white/50 font-body text-xs flex-1 truncate">{f.name}</span>
+                          <span className="text-white/20 font-body text-[10px]">{(f.size / 1024).toFixed(0)} KB</span>
+                          <button
+                            onClick={() => setProofFiles((prev) => prev.filter((_, j) => j !== i))}
+                            className="text-white/20 hover:text-red-400 transition-colors ml-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
                 <button
-                  onClick={() => {
-                    if (!proofDesc.trim()) { toast.warning("Description required", "Tell the AI what you achieved."); return; }
-                    setProofSubmitted(true);
-                    toast.info("Proof queued", "Run the agent pipeline to submit the score on-chain, or ask the oracle to verify manually.");
+                  onClick={async () => {
+                    if (!proofDesc.trim() && !proofGithub.trim() && proofFiles.length === 0) {
+                      toast.warning("Nothing to submit", "Provide a GitHub URL or upload at least one document.");
+                      return;
+                    }
+                    if (!proofDesc.trim()) {
+                      toast.warning("Description required", "Briefly describe what you achieved.");
+                      return;
+                    }
+                    setAgentStatus("running");
+                    try {
+                      const form = new FormData();
+                      form.append("campaign_address", campaign.address);
+                      form.append("milestone_index", String(m.index));
+                      form.append("milestone_description", proofDesc.trim() || m.description);
+                      if (proofGithub.trim()) form.append("github_url", proofGithub.trim());
+                      proofFiles.forEach((f) => form.append("files", f));
+
+                      const res = await fetch("http://127.0.0.1:8000/verify", {
+                        method: "POST",
+                        body: form,
+                      });
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({ detail: res.statusText }));
+                        throw new Error(err.detail ?? "Agent server error");
+                      }
+                      const report = await res.json();
+                      setAgentReport(report);
+                      setAgentStatus("done");
+                      if (report.on_chain) {
+                        toast.success("Score written on-chain", `${Math.round((report.final_score as number) / 100)}/100 · You can now start the milestone vote.`, report.tx_hash as string);
+                        onAction(); // refresh milestone state
+                      } else {
+                        toast.warning("Score computed but not written", report.blockchain_error ?? "Oracle write failed — check server logs.");
+                      }
+                    } catch (err) {
+                      setAgentStatus("error");
+                      toast.error("Agent pipeline failed", err instanceof Error ? err.message : "Could not reach the agent server at http://127.0.0.1:8000");
+                    }
                   }}
                   className="w-full flex items-center justify-center gap-2 liquid-glass-strong rounded-full py-2.5 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity"
                 >
-                  <FileUp className="w-4 h-4" />
-                  Queue for AI Analysis
+                  <Bot className="w-4 h-4" />
+                  Run AI Verification
                 </button>
               </>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-400/8 border border-amber-500/20">
-                <Bot className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-amber-300 font-body font-medium text-xs">Proof queued — awaiting oracle score</p>
-                  {proofGithub && <p className="text-white/25 font-body text-[10px] truncate mt-0.5">{proofGithub}</p>}
+            )}
+
+            {agentStatus === "running" && (
+              <div className="flex items-center gap-3 px-3 py-4 rounded-xl bg-amber-400/5 border border-amber-500/15">
+                <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
+                <div>
+                  <p className="text-amber-300 font-body font-medium text-sm">Agents running…</p>
+                  <p className="text-white/25 font-body text-xs mt-0.5">Analyzing documents, checking GitHub, synthesizing via Claude</p>
                 </div>
+              </div>
+            )}
+
+            {agentStatus === "error" && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/8 border border-red-500/20">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <div>
+                    <p className="text-red-300 font-body font-medium text-xs">Pipeline failed</p>
+                    <p className="text-white/25 font-body text-[10px] mt-0.5">Make sure the agent server is running: <code className="text-white/40">python server.py</code></p>
+                  </div>
+                </div>
+                <button onClick={() => setAgentStatus("idle")} className="text-white/35 font-body text-xs hover:text-white/55 transition-colors">
+                  ← Try again
+                </button>
+              </div>
+            )}
+
+            {agentStatus === "done" && agentReport && (
+              <div className="space-y-2">
+                {/* Score summary */}
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
+                  (agentReport.final_score as number) >= 7000
+                    ? "bg-emerald-400/8 border-emerald-500/20"
+                    : (agentReport.final_score as number) >= 4000
+                    ? "bg-amber-400/8 border-amber-500/20"
+                    : "bg-red-500/8 border-red-500/20"
+                }`}>
+                  <div className={`text-2xl font-heading italic ${
+                    (agentReport.final_score as number) >= 7000 ? "text-emerald-400"
+                    : (agentReport.final_score as number) >= 4000 ? "text-amber-400"
+                    : "text-red-400"
+                  }`}>
+                    {Math.round((agentReport.final_score as number) / 100)}/100
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/70 font-body font-medium text-sm">{agentReport.verdict as string}</p>
+                    <p className="text-white/30 font-body text-xs truncate mt-0.5">{agentReport.reasoning as string}</p>
+                  </div>
+                  {agentReport.on_chain && (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  )}
+                </div>
+
+                {/* Expand for full report */}
+                <button
+                  onClick={() => setReportExpanded((p) => !p)}
+                  className="flex items-center gap-1.5 text-white/30 font-body text-xs hover:text-white/50 transition-colors"
+                >
+                  {reportExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  {reportExpanded ? "Hide" : "Show"} full report
+                </button>
+
+                {reportExpanded && (
+                  <div className="space-y-2">
+                    {(agentReport.key_positive_signals as string[])?.length > 0 && (
+                      <div>
+                        <p className="text-white/25 font-body text-[10px] uppercase tracking-widest mb-1">Positive signals</p>
+                        {(agentReport.key_positive_signals as string[]).map((s, i) => (
+                          <p key={i} className="text-emerald-400/70 font-body text-xs flex gap-1.5">
+                            <span className="shrink-0">+</span>{s}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {(agentReport.key_negative_signals as string[])?.length > 0 && (
+                      <div>
+                        <p className="text-white/25 font-body text-[10px] uppercase tracking-widest mb-1 mt-2">Concerns</p>
+                        {(agentReport.key_negative_signals as string[]).map((s, i) => (
+                          <p key={i} className="text-red-400/70 font-body text-xs flex gap-1.5">
+                            <span className="shrink-0">−</span>{s}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {agentReport.tx_hash && (
+                      <p className="text-white/20 font-mono text-[10px] break-all mt-2">TX: {agentReport.tx_hash as string}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
