@@ -29,6 +29,7 @@ export default function Navbar(): JSX.Element {
     shortAddress,
     network,
     switchToTenderly,
+    switchToLocalhost,
   } = useWallet();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -83,13 +84,21 @@ export default function Navbar(): JSX.Element {
               <div className="flex items-center gap-2">
                 {/* Wrong network warning */}
                 {isWrongNetwork && (
-                  <button
-                    onClick={switchToTenderly}
-                    className="liquid-glass rounded-full flex items-center gap-1.5 px-3 py-2 text-xs font-body text-amber-300 hover:opacity-80 transition-opacity"
-                  >
-                    <AlertTriangle className="w-3 h-3" />
-                    Switch Network
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={switchToLocalhost}
+                      className="liquid-glass rounded-full flex items-center gap-1.5 px-3 py-2 text-xs font-body text-amber-300 hover:opacity-80 transition-opacity"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      Localhost
+                    </button>
+                    <button
+                      onClick={switchToTenderly}
+                      className="liquid-glass rounded-full flex items-center gap-1.5 px-3 py-2 text-xs font-body text-white/40 hover:opacity-80 transition-opacity"
+                    >
+                      Testnet
+                    </button>
+                  </div>
                 )}
 
                 {/* Network indicator + address */}

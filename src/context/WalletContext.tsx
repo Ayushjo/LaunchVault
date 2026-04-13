@@ -39,6 +39,7 @@ interface WalletContextValue {
   setShowWalletModal: (value: boolean) => void;
   availableWallets: WalletOption[];
   switchToTenderly: () => Promise<void>;
+  switchToLocalhost: () => Promise<void>;
   isCorrectNetwork: boolean;
 }
 
@@ -260,6 +261,34 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const switchToLocalhost = async () => {
+    if (!window.ethereum) return;
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: LOCALHOST_CHAIN_ID }],
+      });
+      await fetchNetwork();
+    } catch (err: any) {
+      if (err.code === 4902 || err.code === -32603) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: LOCALHOST_CHAIN_ID,
+              chainName: "Localhost 8545",
+              rpcUrls: ["http://127.0.0.1:8545"],
+              nativeCurrency: { name: "Ethereum", symbol: "ETH", decimals: 18 },
+            }],
+          });
+          await fetchNetwork();
+        } catch (addErr) {
+          console.error("Failed to add localhost network:", addErr);
+        }
+      }
+    }
+  };
+
   const disconnectWallet = () => {
     setWallet(null);
     setNetwork(null);
@@ -285,6 +314,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setShowWalletModal,
         availableWallets,
         switchToTenderly,
+        switchToLocalhost,
         isCorrectNetwork,
       }}
     >
