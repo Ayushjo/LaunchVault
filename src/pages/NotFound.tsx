@@ -1,43 +1,44 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Zap, Search } from "lucide-react";
-import {type JSX} from "react"
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { type JSX } from "react";
+import PageBackground from "../components/layout/PageBackground";
 
 export default function NotFound(): JSX.Element {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-emerald-900/10 rounded-full blur-[120px] pointer-events-none" />
-
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-6">
+      <PageBackground />
       <div className="relative z-10 text-center max-w-lg">
-        <div className="relative inline-block mb-8">
-          <span className="text-[10rem] font-black text-slate-800 leading-none select-none">
+        {/* Ghost number */}
+        <div className="relative mb-8 select-none">
+          <span className="text-[160px] md:text-[200px] font-heading italic leading-none text-white/[0.03]">
             404
           </span>
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl">
-              <Search className="w-10 h-10 text-emerald-400" />
+            <div className="liquid-glass rounded-2xl px-6 py-3">
+              <span className="text-white/40 font-body text-sm uppercase tracking-[0.2em]">Not Found</span>
             </div>
           </div>
         </div>
 
-        <h1 className="text-3xl font-black text-white mb-3 tracking-tight">Page Not Found</h1>
-        <p className="text-slate-400 leading-relaxed mb-8 max-w-sm mx-auto">
-          This page doesn't exist or has been moved. Double-check the URL or head back to explore active campaigns.
+        <h1 className="text-4xl md:text-5xl font-heading italic text-white tracking-tight leading-[0.9] mb-4">
+          This page doesn't exist.
+        </h1>
+        <p className="text-white/40 font-body font-light text-sm leading-relaxed mb-10 max-w-sm mx-auto">
+          The URL may be wrong or the campaign may have moved. Head back and explore what's on-chain.
         </p>
 
         <div className="flex items-center justify-center gap-3 flex-wrap">
-          <Link
-            to="/"
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-900/40"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
+          <Link to="/">
+            <button className="flex items-center gap-2 liquid-glass-strong rounded-full px-6 py-3 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Home
+            </button>
           </Link>
-          <Link
-            to="/create"
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold px-6 py-3 rounded-xl transition-all active:scale-95"
-          >
-            <Zap className="w-4 h-4 text-emerald-400" />
-            Launch Campaign
+          <Link to="/explore">
+            <button className="flex items-center gap-2 bg-white text-black rounded-full px-6 py-3 font-body font-medium text-sm hover:bg-white/90 transition-colors">
+              Explore Campaigns
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
           </Link>
         </div>
       </div>
