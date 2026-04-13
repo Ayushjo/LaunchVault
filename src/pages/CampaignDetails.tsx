@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Users, Clock, Shield, TrendingUp, CheckCircle2,
   XCircle, Loader2, RefreshCw, ExternalLink, AlertCircle,
-  Bot, Lock, Unlock, Vote,
+  Bot, Lock, Unlock, Vote, FileUp, SlidersHorizontal, Github,
 } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { useToast } from "../context/ToastContext";
@@ -12,6 +12,7 @@ import {
   investInCampaign, startMilestoneVote,
   commitVote, revealVote, resolveVote,
   releaseMilestone, claimRefund,
+  submitAgentScore,
   loadCommitRecord,
   fmtEth, fmtBps,
   milestoneStateLabel, campaignStateLabel,
@@ -56,13 +57,17 @@ const CAMPAIGN_STATE_STYLE: Record<number, { text: string; bg: string; border: s
 
 // ── Milestone card ────────────────────────────────────────────────────────────
 
-function MilestoneCard({ m, campaign, wallet, isFounder, onAction }: {
+function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
   m: MilestoneDetails; campaign: ICampaignDetails;
-  wallet: string | null; isFounder: boolean; onAction: () => void;
+  wallet: string | null; isFounder: boolean; isOracle: boolean; onAction: () => void;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [probability, setProbability] = useState(75);
+  const [oracleScore, setOracleScore] = useState(75);
+  const [proofGithub, setProofGithub] = useState("");
+  const [proofDesc, setProofDesc] = useState("");
+  const [proofSubmitted, setProofSubmitted] = useState(false);
   const savedCommit = wallet ? loadCommitRecord(campaign.address, m.index) : null;
   const now = BigInt(Math.floor(Date.now() / 1000));
   const isCurrentMilestone = Number(campaign.currentMilestoneIndex) === m.index;
@@ -168,15 +173,108 @@ function MilestoneCard({ m, campaign, wallet, isFounder, onAction }: {
           </p>
         )}
 
+        {/* FOUNDER: Proof upload panel (when pending + no score yet) */}
+        {isFounder && m.state === MilestoneState.Pending && isCurrentMilestone && !m.agentScoreSubmitted && (
+          <div className="mb-4 liquid-glass rounded-2xl p-4 border border-white/[0.06] space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <FileUp className="w-3.5 h-3.5 text-white/40" />
+              <span className="text-white/55 font-body font-medium text-sm">Submit Proof for AI Review</span>
+            </div>
+            <p className="text-white/30 font-body text-xs leading-relaxed">
+              Provide evidence for this milestone. The AI oracle will analyze your submission and write a verification score on-chain before voting can begin.
+            </p>
+            {!proofSubmitted ? (
+              <>
+                <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
+                  <Github className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="GitHub repo URL (optional)"
+                    value={proofGithub}
+                    onChange={(e) => setProofGithub(e.target.value)}
+                    className="flex-1 bg-transparent text-white text-xs font-body placeholder-white/20 outline-none"
+                  />
+                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Describe what you accomplished for this milestone…"
+                  value={proofDesc}
+                  onChange={(e) => setProofDesc(e.target.value)}
+                  className="w-full liquid-glass rounded-xl px-3 py-2.5 text-xs font-body text-white placeholder-white/20 outline-none bg-transparent border border-white/[0.04] resize-none"
+                />
+                <button
+                  onClick={() => {
+                    if (!proofDesc.trim()) { toast.warning("Description required", "Tell the AI what you achieved."); return; }
+                    setProofSubmitted(true);
+                    toast.info("Proof queued", "Run the agent pipeline to submit the score on-chain, or ask the oracle to verify manually.");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 liquid-glass-strong rounded-full py-2.5 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity"
+                >
+                  <FileUp className="w-4 h-4" />
+                  Queue for AI Analysis
+                </button>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-400/8 border border-amber-500/20">
+                <Bot className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-amber-300 font-body font-medium text-xs">Proof queued — awaiting oracle score</p>
+                  {proofGithub && <p className="text-white/25 font-body text-[10px] truncate mt-0.5">{proofGithub}</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ORACLE: Score submission panel */}
+        {isOracle && m.state === MilestoneState.Pending && !m.agentScoreSubmitted && (
+          <div className="mb-4 liquid-glass rounded-2xl p-4 border border-blue-500/20 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-blue-300 font-body font-medium text-sm">Oracle — Submit AI Score</span>
+              <span className="ml-auto text-white/25 font-body text-[10px] uppercase tracking-widest">Oracle Only</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-white/40 font-body text-xs">Verification score</span>
+              <span className="text-white font-body font-medium text-sm tabular-nums">{oracleScore}/100</span>
+            </div>
+            <input
+              type="range" min={0} max={100} step={1}
+              value={oracleScore}
+              onChange={(e) => setOracleScore(Number(e.target.value))}
+              className="w-full accent-blue-400"
+            />
+            <div className="flex justify-between text-[10px] font-body text-white/20">
+              <span>Fraudulent / Unverified</span>
+              <span>Fully Verified</span>
+            </div>
+            <button
+              disabled={busy}
+              onClick={() => run("Score submitted", () => submitAgentScore(campaign.address, m.index, oracleScore * 100))}
+              className="w-full flex items-center justify-center gap-2 bg-blue-500/20 border border-blue-500/30 rounded-full py-2.5 text-blue-300 font-body font-medium text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-40"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
+              Write Score On-Chain
+            </button>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="space-y-2">
           {/* FOUNDER: Start voting */}
           {isFounder && m.state === MilestoneState.Pending && isCurrentMilestone && campaign.campaignState === CampaignState.Funded && (
-            <button disabled={busy} onClick={() => run("Voting started", () => startMilestoneVote(campaign.address))}
-              className="w-full flex items-center justify-center gap-2 liquid-glass-strong rounded-full py-2.5 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Vote className="w-4 h-4" />}
-              Start Milestone Vote
-            </button>
+            m.agentScoreSubmitted ? (
+              <button disabled={busy} onClick={() => run("Voting started", () => startMilestoneVote(campaign.address))}
+                className="w-full flex items-center justify-center gap-2 liquid-glass-strong rounded-full py-2.5 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40">
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Vote className="w-4 h-4" />}
+                Start Milestone Vote
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-white/8 text-white/25">
+                <Bot className="w-4 h-4 shrink-0" />
+                <span className="font-body text-xs">Waiting for oracle score before voting can start</span>
+              </div>
+            )
           )}
 
           {/* FOUNDER: Release funds */}
@@ -354,6 +452,7 @@ export default function CampaignDetails() {
   );
 
   const isFounder = wallet?.toLowerCase() === campaign.founder.toLowerCase();
+  const isOracle = wallet?.toLowerCase() === campaign.oracle.toLowerCase();
   const progressPct = pct(campaign.totalRaised, campaign.goal);
   const isActive = campaign.campaignState === CampaignState.Active;
   const campStyle = CAMPAIGN_STATE_STYLE[campaign.campaignState] ?? CAMPAIGN_STATE_STYLE[0];
@@ -501,7 +600,7 @@ export default function CampaignDetails() {
               Milestones
             </h2>
             {milestones.map((m) => (
-              <MilestoneCard key={m.index} m={m} campaign={campaign} wallet={wallet} isFounder={isFounder} onAction={load} />
+              <MilestoneCard key={m.index} m={m} campaign={campaign} wallet={wallet} isFounder={isFounder} isOracle={isOracle} onAction={load} />
             ))}
           </div>
         </div>

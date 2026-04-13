@@ -354,6 +354,18 @@ export async function cancelCampaign(campaignAddress: string): Promise<string> {
   return tx.hash;
 }
 
+/** Oracle-only: write AI verification score on-chain (0–10000) */
+export async function submitAgentScore(
+  campaignAddress: string,
+  milestoneIndex: number,
+  score: number // 0–10000
+): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.submitAgentScore(milestoneIndex, BigInt(score));
+  await tx.wait();
+  return tx.hash;
+}
+
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
 export { formatEther, parseEther };
