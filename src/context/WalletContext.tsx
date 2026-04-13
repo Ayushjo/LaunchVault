@@ -49,6 +49,7 @@ declare global {
 }
 
 const TENDERLY_CHAIN_ID = "0x26f7"; // 9991 in hex
+const LOCALHOST_CHAIN_ID = "0x7a69"; // 31337 in hex
 const TENDERLY_RPC =
   "https://virtual.mainnet.eu.rpc.tenderly.co/45a59347-a54d-40a5-916a-d594f88b45fb";
 
@@ -72,7 +73,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [showWalletModal, setShowWalletModal] = useState<boolean>(false);
   const [availableWallets, setAvailableWallets] = useState<WalletOption[]>([]);
 
-  const isCorrectNetwork = chainId === TENDERLY_CHAIN_ID;
+  const isCorrectNetwork = chainId === TENDERLY_CHAIN_ID || chainId === LOCALHOST_CHAIN_ID;
 
   // Detect available wallets
   useEffect(() => {

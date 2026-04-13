@@ -5,8 +5,12 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        heading: ["'Instrument Serif'", "serif"],
+        body: ["'Barlow'", "sans-serif"],
+      },
+    },
   },
   plugins: [],
 }
-

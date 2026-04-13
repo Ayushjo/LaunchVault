@@ -1,164 +1,390 @@
-import { BrowserProvider, Contract, parseEther } from "ethers";
+/**
+ * useCampaign — V2 contract interaction layer
+ *
+ * Covers the full CampaignV2 / CampaignFactoryV2 / CampaignTokenV2 API.
+ * Commit-reveal voting helpers and localStorage persistence for in-flight votes.
+ */
+
 import {
-  CAMPAIGN_ABI,
-  FACTORY_ABI,
-  CONTRACT_CONFIG,
+  BrowserProvider,
+  Contract,
+  parseEther,
+  formatEther,
+  solidityPackedKeccak256,
+  randomBytes,
+  hexlify,
+  type ContractTransactionResponse,
+  type Eip1193Provider,
+} from "ethers";
+import {
+  FACTORY_ADDRESS,
+  CAMPAIGN_V2_ABI,
+  FACTORY_V2_ABI,
+  TOKEN_V2_ABI,
 } from "../contracts/config";
 
-export interface OnChainCampaign {
+// ── State constants (const objects instead of enum — erasableSyntaxOnly) ──────
+
+export type CampaignState = 0 | 1 | 2 | 3;
+export const CampaignState = {
+  Active: 0 as CampaignState,
+  Funded: 1 as CampaignState,
+  Completed: 2 as CampaignState,
+  Cancelled: 3 as CampaignState,
+};
+
+export type MilestoneState = 0 | 1 | 2 | 3 | 4 | 5;
+export const MilestoneState = {
+  Pending: 0 as MilestoneState,
+  VotingOpen: 1 as MilestoneState,
+  RevealOpen: 2 as MilestoneState,
+  Passed: 3 as MilestoneState,
+  Failed: 4 as MilestoneState,
+  Inconclusive: 5 as MilestoneState,
+};
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface CampaignListItem {
   address: string;
   founder: string;
   title: string;
   goal: bigint;
-  deadline: bigint;
   createdAt: bigint;
 }
 
-export interface CampaignInfo {
+export interface CampaignDetails {
+  address: string;
   founder: string;
+  oracle: string;
   title: string;
   description: string;
-  milestoneDescription: string;
   goal: bigint;
   deadline: bigint;
   totalRaised: bigint;
-  goalReached: boolean;
-  fundsReleased: boolean;
-  cancelled: boolean;
+  founderStake: bigint;
+  campaignState: CampaignState;
+  currentMilestoneIndex: bigint;
+  milestoneCount: bigint;
+  investorCount: bigint;
+  tokenAddress: string;
+  tokenBalance?: bigint;
+  tokenName?: string;
+  tokenSymbol?: string;
+  investedAmount?: bigint;
+  reputationScore?: bigint;
 }
 
-// Get all campaigns from factory
-export async function fetchAllCampaigns(): Promise<OnChainCampaign[]> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const factory = new Contract(
-    CONTRACT_CONFIG.factoryAddress,
-    FACTORY_ABI,
-    provider,
-  );
-  const campaigns = await factory.getCampaigns();
-  return campaigns.map((c: any) => ({
-    address: c.campaignAddress,
-    founder: c.founder,
-    title: c.title,
-    goal: c.goal,
-    deadline: c.deadline,
-    createdAt: c.createdAt,
+export interface MilestoneDetails {
+  index: number;
+  description: string;
+  fundingBps: bigint;
+  state: MilestoneState;
+  agentScore: bigint;
+  agentScoreSubmitted: boolean;
+  commitDeadline: bigint;
+  revealDeadline: bigint;
+  ethAllocation: bigint;
+  fundsReleased: boolean;
+  participantCount: bigint;
+  hasCommitted?: boolean;
+  hasRevealed?: boolean;
+}
+
+export interface CommitRecord {
+  probability: number; // 0-10000
+  salt: string; // 0x-prefixed bytes32
+  milestoneIndex: number;
+  campaignAddress: string;
+  committedAt: number;
+}
+
+export interface CreateCampaignParams {
+  title: string;
+  description: string;
+  goal: string;
+  deadline: string;
+  tokenName: string;
+  tokenSymbol: string;
+  milestones: { description: string; bps: number }[];
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+function getProvider() {
+  if (!window.ethereum) throw new Error("No wallet detected");
+  return new BrowserProvider(window.ethereum as unknown as Eip1193Provider);
+}
+
+async function getSigner() {
+  return getProvider().getSigner();
+}
+
+function factoryRO() {
+  return new Contract(FACTORY_ADDRESS, FACTORY_V2_ABI, getProvider());
+}
+async function factoryRW() {
+  return new Contract(FACTORY_ADDRESS, FACTORY_V2_ABI, await getSigner());
+}
+function campaignRO(addr: string) {
+  return new Contract(addr, CAMPAIGN_V2_ABI, getProvider());
+}
+async function campaignRW(addr: string) {
+  return new Contract(addr, CAMPAIGN_V2_ABI, await getSigner());
+}
+function tokenRO(addr: string) {
+  return new Contract(addr, TOKEN_V2_ABI, getProvider());
+}
+
+// ── Error extraction ──────────────────────────────────────────────────────────
+
+export function extractError(err: unknown): string {
+  if (err instanceof Error) {
+    const m = err.message;
+    const r = m.match(/reason="([^"]+)"/) ?? m.match(/reverted with reason string '([^']+)'/);
+    if (r) return r[1];
+    if (m.includes("user rejected")) return "Transaction rejected by user";
+    if (m.includes("insufficient funds")) return "Insufficient ETH balance";
+    return m.slice(0, 140);
+  }
+  return "Unknown error";
+}
+
+// ── Commit-reveal localStorage ────────────────────────────────────────────────
+
+function commitKey(addr: string, idx: number) {
+  return `lv_commit_${addr.toLowerCase()}_${idx}`;
+}
+
+export function saveCommitRecord(r: CommitRecord) {
+  localStorage.setItem(commitKey(r.campaignAddress, r.milestoneIndex), JSON.stringify(r));
+}
+export function loadCommitRecord(addr: string, idx: number): CommitRecord | null {
+  try {
+    const raw = localStorage.getItem(commitKey(addr, idx));
+    return raw ? (JSON.parse(raw) as CommitRecord) : null;
+  } catch { return null; }
+}
+export function clearCommitRecord(addr: string, idx: number) {
+  localStorage.removeItem(commitKey(addr, idx));
+}
+
+/** keccak256(abi.encodePacked(probability, salt)) — must match Solidity exactly */
+export function buildCommitHash(probability: number, salt: string): string {
+  return solidityPackedKeccak256(["uint256", "bytes32"], [BigInt(probability), salt]);
+}
+export function generateSalt(): string {
+  return hexlify(randomBytes(32));
+}
+
+// ── Read functions ────────────────────────────────────────────────────────────
+
+export async function fetchAllCampaigns(): Promise<CampaignListItem[]> {
+  const factory = factoryRO();
+  const raw = await factory.getCampaigns();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return raw.map((c: any) => ({
+    address: c.campaignAddress as string,
+    founder: c.founder as string,
+    title: c.title as string,
+    goal: c.goal as bigint,
+    createdAt: c.createdAt as bigint,
   }));
 }
 
-// Get single campaign details
-export async function fetchCampaignInfo(
-  address: string,
-): Promise<CampaignInfo> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const campaign = new Contract(address, CAMPAIGN_ABI, provider);
-  const info = await campaign.getCampaignInfo();
-  return {
-    founder: info[0],
-    title: info[1],
-    description: info[2],
-    milestoneDescription: info[3],
-    goal: info[4],
-    deadline: info[5],
-    totalRaised: info[6],
-    goalReached: info[7],
-    fundsReleased: info[8],
-    cancelled: info[9],
+export async function fetchCampaignDetails(
+  campaignAddress: string,
+  walletAddress?: string
+): Promise<CampaignDetails> {
+  const c = campaignRO(campaignAddress);
+  const [
+    founder, oracle, title, description, goal, deadline,
+    totalRaised, founderStake, campaignStateRaw,
+    currentMilestoneIndex, milestoneCount, investorCount, tokenAddress,
+  ] = await Promise.all([
+    c.founder(), c.oracle(), c.title(), c.description(),
+    c.goal(), c.deadline(), c.totalRaised(), c.founderStake(),
+    c.campaignState(), c.currentMilestoneIndex(),
+    c.milestoneCount(), c.investorCount(), c.token(),
+  ]);
+
+  const details: CampaignDetails = {
+    address: campaignAddress, founder, oracle, title, description,
+    goal, deadline, totalRaised, founderStake,
+    campaignState: Number(campaignStateRaw) as CampaignState,
+    currentMilestoneIndex, milestoneCount, investorCount, tokenAddress,
   };
-}
 
-// Invest in a campaign
-export async function investInCampaign(
-  address: string,
-  amountEth: string,
-): Promise<string> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const signer = await provider.getSigner();
-  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
-  const tx = await campaign.invest({ value: parseEther(amountEth) });
-  await tx.wait();
-  return tx.hash;
-}
-
-// Deploy new campaign via factory
-export async function createCampaign(params: {
-  title: string;
-  description: string;
-  milestoneDescription: string;
-  goal: string;
-  deadline: string;
-  tokenSymbol: string;
-}): Promise<string> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const signer = await provider.getSigner();
-  const factory = new Contract(
-    CONTRACT_CONFIG.factoryAddress,
-    FACTORY_ABI,
-    signer,
-  );
-
-  const goalWei = parseEther(params.goal);
-  const deadlineTs = BigInt(
-    Math.floor(new Date(params.deadline).getTime() / 1000),
-  );
-  const tokenName = params.title.split(" ")[0] + " Token";
-
-  const tx = await factory.createCampaign(
-    params.title,
-    params.description,
-    params.milestoneDescription,
-    goalWei,
-    deadlineTs,
-    tokenName,
-    params.tokenSymbol,
-  );
-
-  const receipt = await tx.wait();
-
-  // Extract deployed campaign address from event
-  const iface = factory.interface;
-  for (const log of receipt.logs) {
-    try {
-      const parsed = iface.parseLog(log);
-      if (parsed?.name === "CampaignCreated") {
-        return parsed.args[0]; // campaignAddress
-      }
-    } catch {}
+  if (walletAddress) {
+    const t = tokenRO(tokenAddress);
+    const [tokenBalance, tokenName, tokenSymbol, investedAmount, reputationScore] =
+      await Promise.all([
+        t.balanceOf(walletAddress),
+        t.name(),
+        t.symbol(),
+        c.investedAmount(walletAddress),
+        t.getReputationScore(walletAddress),
+      ]);
+    Object.assign(details, { tokenBalance, tokenName, tokenSymbol, investedAmount, reputationScore });
   }
 
-  throw new Error("Could not find CampaignCreated event in receipt");
+  return details;
 }
-export async function voteOnCampaign(
-  address: string,
-  approve: boolean,
-): Promise<string> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const signer = await provider.getSigner();
-  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
-  const tx = await campaign.vote(approve);
+
+export async function fetchMilestones(
+  campaignAddress: string,
+  walletAddress?: string
+): Promise<MilestoneDetails[]> {
+  const c = campaignRO(campaignAddress);
+  const count = Number(await c.milestoneCount());
+  const milestones: MilestoneDetails[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const [desc, fundingBps, state, agentScore, agentScoreSubmitted,
+           commitDeadline, revealDeadline, ethAllocation, fundsReleased, participantCount] =
+      await c.getMilestone(i);
+
+    const m: MilestoneDetails = {
+      index: i, description: desc, fundingBps,
+      state: Number(state) as MilestoneState,
+      agentScore, agentScoreSubmitted,
+      commitDeadline, revealDeadline, ethAllocation, fundsReleased, participantCount,
+    };
+    if (walletAddress) {
+      const [committed, revealed] = await c.getCommitStatus(i, walletAddress);
+      m.hasCommitted = committed;
+      m.hasRevealed = revealed;
+    }
+    milestones.push(m);
+  }
+  return milestones;
+}
+
+// ── Write functions ───────────────────────────────────────────────────────────
+
+export async function investInCampaign(campaignAddress: string, amountEth: string): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.invest({ value: parseEther(amountEth) });
   await tx.wait();
   return tx.hash;
 }
 
-export async function startVoting(address: string): Promise<string> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const signer = await provider.getSigner();
-  const campaign = new Contract(address, CAMPAIGN_ABI, signer);
-  const tx = await campaign.startVoting();
+export async function createCampaign(params: CreateCampaignParams): Promise<string> {
+  const factory = await factoryRW();
+  const goalWei = parseEther(params.goal);
+  const requiredStake = (goalWei * BigInt(1000)) / BigInt(10000); // 10%
+  const deadlineTs = BigInt(Math.floor(new Date(params.deadline).getTime() / 1000));
+
+  const tx: ContractTransactionResponse = await factory.createCampaign(
+    params.title, params.description, goalWei, deadlineTs,
+    params.tokenName, params.tokenSymbol,
+    params.milestones.map((m) => m.description),
+    params.milestones.map((m) => m.bps),
+    { value: requiredStake }
+  );
+  const receipt = await tx.wait();
+
+  const iface = factory.interface;
+  for (const log of receipt?.logs ?? []) {
+    try {
+      const parsed = iface.parseLog(log);
+      if (parsed?.name === "CampaignCreated") return parsed.args.campaignAddress as string;
+    } catch { /* skip */ }
+  }
+  throw new Error("CampaignCreated event not found in receipt");
+}
+
+export async function startMilestoneVote(campaignAddress: string): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.startMilestoneVote();
   await tx.wait();
   return tx.hash;
 }
 
-export async function getVotingStatus(
-  address: string,
-): Promise<{
-  active: boolean;
-  endTime: bigint;
-  yesVotes: bigint;
-  noVotes: bigint;
-}> {
-  const provider = new BrowserProvider((window as any).ethereum);
-  const contract = new Contract(address, CAMPAIGN_ABI, provider);
-  const [active, endTime, yesVotes, noVotes] = await contract.getVotingStatus();
-  return { active, endTime, yesVotes, noVotes };
+export async function commitVote(
+  campaignAddress: string,
+  milestoneIndex: number,
+  probability: number // 0–10000
+): Promise<CommitRecord> {
+  const salt = generateSalt();
+  const hash = buildCommitHash(probability, salt);
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.commitVote(milestoneIndex, hash);
+  await tx.wait();
+  const record: CommitRecord = { probability, salt, milestoneIndex, campaignAddress, committedAt: Date.now() };
+  saveCommitRecord(record);
+  return record;
 }
+
+export async function revealVote(campaignAddress: string, milestoneIndex: number): Promise<string> {
+  const record = loadCommitRecord(campaignAddress, milestoneIndex);
+  if (!record) throw new Error("No saved commit found — was this vote committed in this browser?");
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.revealVote(milestoneIndex, BigInt(record.probability), record.salt);
+  await tx.wait();
+  clearCommitRecord(campaignAddress, milestoneIndex);
+  return tx.hash;
+}
+
+export async function resolveVote(campaignAddress: string, milestoneIndex: number): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.resolveVote(milestoneIndex);
+  await tx.wait();
+  return tx.hash;
+}
+
+export async function releaseMilestone(campaignAddress: string, milestoneIndex: number): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.releaseMilestone(milestoneIndex);
+  await tx.wait();
+  return tx.hash;
+}
+
+export async function claimRefund(campaignAddress: string, milestoneIndex: number): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.claimRefund(milestoneIndex);
+  await tx.wait();
+  return tx.hash;
+}
+
+export async function cancelCampaign(campaignAddress: string): Promise<string> {
+  const c = await campaignRW(campaignAddress);
+  const tx: ContractTransactionResponse = await c.cancelCampaign();
+  await tx.wait();
+  return tx.hash;
+}
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+export { formatEther, parseEther };
+
+export function fmtEth(wei: bigint, decimals = 4): string {
+  return Number(formatEther(wei)).toFixed(decimals);
+}
+
+export function fmtScore(score: bigint): string {
+  return (Number(score) / 100).toFixed(0) + "%";
+}
+
+export function fmtBps(bps: bigint): string {
+  return (Number(bps) / 100).toFixed(0) + "%";
+}
+
+export function milestoneStateLabel(state: MilestoneState): string {
+  const labels: Record<number, string> = {
+    0: "Pending", 1: "Commit Phase", 2: "Reveal Phase",
+    3: "Passed", 4: "Failed", 5: "Inconclusive",
+  };
+  return labels[state] ?? "Unknown";
+}
+
+export function campaignStateLabel(state: CampaignState): string {
+  const labels: Record<number, string> = {
+    0: "Active", 1: "Funded", 2: "Completed", 3: "Cancelled",
+  };
+  return labels[state] ?? "Unknown";
+}
+
+// ── Legacy type aliases ───────────────────────────────────────────────────────
+export type OnChainCampaign = CampaignListItem;
+export type CampaignInfo = CampaignDetails;
