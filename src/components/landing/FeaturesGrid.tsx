@@ -1,4 +1,4 @@
-import { Zap, Palette, BarChart3, Shield } from "lucide-react";
+import { Lock, Bot, BarChart3, Shield } from "lucide-react";
 import { motion } from "motion/react";
 import BlurText from "./BlurText";
 import type { LucideIcon } from "lucide-react";
@@ -9,12 +9,12 @@ const cards: {
   body: string;
 }[] = [
   {
-    Icon: Zap,
+    Icon: Lock,
     title: "Milestone-Gated Capital",
     body: "Funds only move when milestones are verified. No rubber stamps, no trust required — just cryptographic proof on an immutable ledger.",
   },
   {
-    Icon: Palette,
+    Icon: Bot,
     title: "Multi-Layer AI Verification",
     body: "Document forensics, GitHub analysis, and LLM reasoning combine into one tamper-resistant on-chain verdict you can audit.",
   },
