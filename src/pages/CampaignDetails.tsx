@@ -5,6 +5,7 @@ import {
   XCircle, Loader2, RefreshCw, ExternalLink, AlertCircle,
   Bot, Lock, Unlock, Vote, FileUp, SlidersHorizontal, Github,
   Trash2, File, Image, ChevronDown, ChevronUp,
+  Globe, Building2, UserCheck,
 } from "lucide-react";
 import { useWallet } from "../context/WalletContext";
 import { useToast } from "../context/ToastContext";
@@ -69,9 +70,13 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
   const [proofGithub, setProofGithub] = useState("");
   const [proofDesc, setProofDesc] = useState("");
   const [proofFiles, setProofFiles] = useState<File[]>([]);
+  const [companyName, setCompanyName] = useState("");
+  const [companyWebsite, setCompanyWebsite] = useState("");
+  const [teamMembers, setTeamMembers] = useState("");
   const [agentStatus, setAgentStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [agentReport, setAgentReport] = useState<Record<string, unknown> | null>(null);
   const [reportExpanded, setReportExpanded] = useState(false);
+  const [osintExpanded, setOsintExpanded] = useState(false);
   const savedCommit = wallet ? loadCommitRecord(campaign.address, m.index) : null;
   const now = BigInt(Math.floor(Date.now() / 1000));
   const isCurrentMilestone = Number(campaign.currentMilestoneIndex) === m.index;
@@ -190,6 +195,42 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
 
             {agentStatus === "idle" && (
               <>
+                {/* Company identity — used for OSINT */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
+                    <Building2 className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Company name"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="flex-1 bg-transparent text-white text-xs font-body placeholder-white/20 outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
+                    <Globe className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Website (e.g. neuralpay.io)"
+                      value={companyWebsite}
+                      onChange={(e) => setCompanyWebsite(e.target.value)}
+                      className="flex-1 bg-transparent text-white text-xs font-body placeholder-white/20 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Team members */}
+                <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
+                  <UserCheck className="w-3.5 h-3.5 text-white/30 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Team members (comma-separated: John Smith, Jane Doe)"
+                    value={teamMembers}
+                    onChange={(e) => setTeamMembers(e.target.value)}
+                    className="flex-1 bg-transparent text-white text-xs font-body placeholder-white/20 outline-none"
+                  />
+                </div>
+
                 {/* GitHub URL */}
                 <div className="flex items-center gap-2 liquid-glass rounded-xl px-3 py-2 border border-white/[0.04]">
                   <Github className="w-3.5 h-3.5 text-white/30 shrink-0" />
@@ -275,6 +316,9 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
                       form.append("milestone_index", String(m.index));
                       form.append("milestone_description", proofDesc.trim() || m.description);
                       if (proofGithub.trim()) form.append("github_url", proofGithub.trim());
+                      if (companyName.trim()) form.append("company_name", companyName.trim());
+                      if (companyWebsite.trim()) form.append("company_website", companyWebsite.trim());
+                      if (teamMembers.trim()) form.append("team_members", teamMembers.trim());
                       proofFiles.forEach((f) => form.append("files", f));
 
                       const res = await fetch("http://127.0.0.1:8000/verify", {
@@ -312,7 +356,7 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
                 <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
                 <div>
                   <p className="text-amber-300 font-body font-medium text-sm">Agents running…</p>
-                  <p className="text-white/25 font-body text-xs mt-0.5">Analyzing documents, checking GitHub, synthesizing via Claude</p>
+                  <p className="text-white/25 font-body text-xs mt-0.5">OSINT entity check · document forensics · GitHub analysis · Claude synthesis</p>
                 </div>
               </div>
             )}
@@ -389,6 +433,72 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
                         ))}
                       </div>
                     )}
+                    {/* OSINT section */}
+                    {agentReport.osint && (
+                      <div className="mt-2 border-t border-white/[0.04] pt-2">
+                        <button
+                          onClick={() => setOsintExpanded((p) => !p)}
+                          className="flex items-center gap-1.5 text-white/30 font-body text-xs hover:text-white/50 transition-colors w-full"
+                        >
+                          {osintExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          <Building2 className="w-3 h-3" />
+                          Entity verification · {(agentReport.osint as Record<string, unknown>).verdict as string}
+                          <span className={`ml-auto font-mono ${
+                            ((agentReport.osint as Record<string, unknown>).score as number) >= 7000 ? "text-emerald-400/70"
+                            : ((agentReport.osint as Record<string, unknown>).score as number) >= 4000 ? "text-amber-400/70"
+                            : "text-red-400/70"
+                          }`}>
+                            {Math.round(((agentReport.osint as Record<string, unknown>).score as number) / 100)}/100
+                          </span>
+                        </button>
+                        {osintExpanded && (() => {
+                          const o = agentReport.osint as Record<string, unknown>;
+                          const sigs = (o.signals ?? {}) as Record<string, number>;
+                          const facts = (o.verified_facts ?? []) as string[];
+                          const flags = (o.flags ?? []) as string[];
+                          return (
+                            <div className="mt-2 space-y-2 pl-2">
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                                {[
+                                  ["Domain", sigs.domain_intelligence],
+                                  ["Registration", sigs.company_registration],
+                                  ["Web presence", sigs.web_presence],
+                                  ["News", sigs.news_coverage],
+                                  ["Team", sigs.team_verification],
+                                ].map(([label, val]) => val !== undefined && (
+                                  <div key={label as string} className="flex justify-between text-[10px] font-body">
+                                    <span className="text-white/25">{label}</span>
+                                    <span className={`font-mono ${(val as number) >= 7000 ? "text-emerald-400/60" : (val as number) >= 4000 ? "text-amber-400/60" : "text-red-400/60"}`}>
+                                      {Math.round((val as number) / 100)}/100
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                              {o.consistency_assessment && (
+                                <p className="text-white/30 font-body text-[10px] leading-relaxed">{o.consistency_assessment as string}</p>
+                              )}
+                              {facts.length > 0 && (
+                                <div>
+                                  <p className="text-white/20 font-body text-[10px] uppercase tracking-widest mb-1">Verified facts</p>
+                                  {facts.slice(0, 4).map((f, i) => (
+                                    <p key={i} className="text-emerald-400/50 font-body text-[10px] flex gap-1.5"><span className="shrink-0">✓</span>{f}</p>
+                                  ))}
+                                </div>
+                              )}
+                              {flags.length > 0 && (
+                                <div>
+                                  <p className="text-white/20 font-body text-[10px] uppercase tracking-widest mb-1">Flags</p>
+                                  {flags.slice(0, 4).map((f, i) => (
+                                    <p key={i} className="text-red-400/50 font-body text-[10px] flex gap-1.5"><span className="shrink-0">⚑</span>{f}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     {agentReport.tx_hash && (
                       <p className="text-white/20 font-mono text-[10px] break-all mt-2">TX: {agentReport.tx_hash as string}</p>
                     )}
