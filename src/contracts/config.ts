@@ -3,15 +3,16 @@ import CampaignFactoryV2ABI from "./CampaignFactoryV2.json";
 import CampaignTokenV2ABI from "./CampaignTokenV2.json";
 
 // ── Network ──────────────────────────────────────────────────────────────────
-export const CHAIN_ID = 9991;
+export const CHAIN_ID   = Number(import.meta.env.VITE_CHAIN_ID ?? 9991);
+export const RPC_URL    = (import.meta.env.VITE_RPC_URL as string) ??
+  "https://virtual.mainnet.eu.rpc.tenderly.co/c416a257-7f66-496d-a5fe-44177d251811";
 export const NETWORK_NAME = "LaunchVault Testnet";
 export const EXPLORER_URL = "https://dashboard.tenderly.co";
 
 // ── Contract Addresses ───────────────────────────────────────────────────────
-// Override via VITE_FACTORY_ADDRESS in .env for local development
 export const FACTORY_ADDRESS: string =
   (import.meta.env.VITE_FACTORY_ADDRESS as string) ??
-  "0x40d95667d7Fb3af5cDba41E3EDf4414D1a26148a";
+  "0x5bCC3154698bBC205ABF09351A52DD2d1A39F608";
 
 // ── ABIs ─────────────────────────────────────────────────────────────────────
 export const CAMPAIGN_V2_ABI = CampaignV2ABI.abi;

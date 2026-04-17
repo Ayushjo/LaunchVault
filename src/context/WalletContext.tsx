@@ -52,7 +52,7 @@ declare global {
 const TENDERLY_CHAIN_ID = "0x26f7"; // 9991 in hex
 const LOCALHOST_CHAIN_ID = "0x7a69"; // 31337 in hex
 const TENDERLY_RPC =
-  "https://virtual.mainnet.eu.rpc.tenderly.co/45a59347-a54d-40a5-916a-d594f88b45fb";
+  "https://virtual.mainnet.eu.rpc.tenderly.co/c416a257-7f66-496d-a5fe-44177d251811";
 
 const NETWORK_NAMES: Record<string, string> = {
   "0x1": "Ethereum",
