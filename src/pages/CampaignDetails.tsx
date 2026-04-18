@@ -16,6 +16,7 @@ import {
   releaseMilestone, claimRefund,
   submitAgentScore,
   loadCommitRecord,
+  getBlockTimestamp,
   fmtEth, fmtBps,
   milestoneStateLabel, campaignStateLabel,
   CampaignState, MilestoneState,
@@ -31,13 +32,13 @@ function pct(raised: bigint, goal: bigint): number {
   return Math.min(100, Number((raised * BigInt(100)) / goal));
 }
 
-function timeLeft(ts: bigint): string {
-  const diff = Number(ts) * 1000 - Date.now();
-  if (diff <= 0) return "Expired";
-  const d = Math.floor(diff / 86400000);
-  const h = Math.floor((diff % 86400000) / 3600000);
+function timeLeft(ts: bigint, chainNow: bigint): string {
+  const diffSec = Number(ts) - Number(chainNow);
+  if (diffSec <= 0) return "Expired";
+  const d = Math.floor(diffSec / 86400);
+  const h = Math.floor((diffSec % 86400) / 3600);
   if (d > 0) return `${d}d ${h}h left`;
-  return `${h}h ${Math.floor((diff % 3600000) / 60000)}m left`;
+  return `${h}h ${Math.floor((diffSec % 3600) / 60)}m left`;
 }
 
 // State → accent colors
@@ -59,9 +60,10 @@ const CAMPAIGN_STATE_STYLE: Record<number, { text: string; bg: string; border: s
 
 // ── Milestone card ────────────────────────────────────────────────────────────
 
-function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
+function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, chainNow }: {
   m: MilestoneDetails; campaign: ICampaignDetails;
   wallet: string | null; isFounder: boolean; isOracle: boolean; onAction: () => void;
+  chainNow: bigint;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -78,7 +80,7 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
   const [reportExpanded, setReportExpanded] = useState(false);
   const [osintExpanded, setOsintExpanded] = useState(false);
   const savedCommit = wallet ? loadCommitRecord(campaign.address, m.index) : null;
-  const now = BigInt(Math.floor(Date.now() / 1000));
+  const now = chainNow;
   const isCurrentMilestone = Number(campaign.currentMilestoneIndex) === m.index;
   const style = MS_STYLE[m.state] ?? MS_STYLE[0];
 
@@ -164,13 +166,13 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
             <div className={`liquid-glass rounded-xl px-3 py-2.5 text-center ${m.state === MilestoneState.VotingOpen ? "border border-amber-500/20" : "border border-white/5"}`}>
               <p className="text-white/30 font-body text-[10px] uppercase tracking-widest mb-0.5">Commit</p>
               <p className={`font-body font-medium text-xs ${now < m.commitDeadline ? "text-amber-300" : "text-white/20 line-through"}`}>
-                {timeLeft(m.commitDeadline)}
+                {timeLeft(m.commitDeadline, now)}
               </p>
             </div>
             <div className={`liquid-glass rounded-xl px-3 py-2.5 text-center ${m.state === MilestoneState.RevealOpen ? "border border-blue-500/20" : "border border-white/5"}`}>
               <p className="text-white/30 font-body text-[10px] uppercase tracking-widest mb-0.5">Reveal</p>
               <p className={`font-body font-medium text-xs ${now < m.revealDeadline && now >= m.commitDeadline ? "text-blue-300" : now < m.commitDeadline ? "text-white/20" : "text-white/20 line-through"}`}>
-                {timeLeft(m.revealDeadline)}
+                {timeLeft(m.revealDeadline, now)}
               </p>
             </div>
           </div>
@@ -601,7 +603,7 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction }: {
               <CheckCircle2 className="w-4 h-4 text-amber-400" />
               <div>
                 <p className="text-amber-300 font-body font-medium text-sm">Vote committed</p>
-                <p className="text-white/35 font-body text-xs">Reveal after {timeLeft(m.commitDeadline)}</p>
+                <p className="text-white/35 font-body text-xs">Reveal after {timeLeft(m.commitDeadline, now)}</p>
               </div>
               {savedCommit && <span className="ml-auto text-white/25 font-body text-xs">{savedCommit.probability / 100}%</span>}
             </div>
@@ -678,6 +680,12 @@ export default function CampaignDetails() {
   const [investAmount, setInvestAmount] = useState("");
   const [investing, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Chain time — updated from block.timestamp so evm_increaseTime is reflected
+  const [chainNow, setChainNow] = useState<bigint>(BigInt(Math.floor(Date.now() / 1000)));
+
+  const syncChainTime = useCallback(async () => {
+    try { setChainNow(await getBlockTimestamp()); } catch { /* keep last value */ }
+  }, []);
 
   const load = useCallback(async () => {
     if (!campaignAddress) return;
@@ -685,6 +693,7 @@ export default function CampaignDetails() {
       const [c, ms] = await Promise.all([
         fetchCampaignDetails(campaignAddress, wallet ?? undefined),
         fetchMilestones(campaignAddress, wallet ?? undefined),
+        syncChainTime(),
       ]);
       setCampaign(c);
       setMilestones(ms);
@@ -694,9 +703,16 @@ export default function CampaignDetails() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [campaignAddress, wallet, toast]);
+  }, [campaignAddress, wallet, toast, syncChainTime]);
 
+  // Initial load + poll every 10s so timers stay live and phase transitions auto-detect
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      syncChainTime();
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [syncChainTime]);
 
   const handleRefresh = () => { setRefreshing(true); load(); };
 
@@ -807,7 +823,7 @@ export default function CampaignDetails() {
               </div>
               <div className="flex justify-between text-xs font-body text-white/25">
                 <span>{progressPct}% funded</span>
-                <span>{timeLeft(campaign.deadline)}</span>
+                <span>{timeLeft(campaign.deadline, chainNow)}</span>
               </div>
             </div>
 
@@ -883,7 +899,7 @@ export default function CampaignDetails() {
               Milestones
             </h2>
             {milestones.map((m) => (
-              <MilestoneCard key={m.index} m={m} campaign={campaign} wallet={wallet} isFounder={isFounder} isOracle={isOracle} onAction={load} />
+              <MilestoneCard key={m.index} m={m} campaign={campaign} wallet={wallet} isFounder={isFounder} isOracle={isOracle} onAction={load} chainNow={chainNow} />
             ))}
           </div>
         </div>

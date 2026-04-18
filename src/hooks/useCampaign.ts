@@ -136,6 +136,14 @@ function tokenRO(addr: string) {
   return new Contract(addr, TOKEN_V2_ABI, getProvider());
 }
 
+// ── Block timestamp (use instead of Date.now() for testnet time travel) ───────
+
+/** Returns the current block.timestamp from the chain (not wall clock). */
+export async function getBlockTimestamp(): Promise<bigint> {
+  const block = await getProvider().getBlock("latest");
+  return BigInt(block?.timestamp ?? Math.floor(Date.now() / 1000));
+}
+
 // ── Error extraction ──────────────────────────────────────────────────────────
 
 export function extractError(err: unknown): string {
