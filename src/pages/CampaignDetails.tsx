@@ -597,8 +597,8 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
             </div>
           )}
 
-          {/* INVESTOR: Committed, waiting */}
-          {!isFounder && wallet && m.hasCommitted && !m.hasRevealed && m.state === MilestoneState.VotingOpen && (
+          {/* INVESTOR: Committed, waiting for commit deadline */}
+          {!isFounder && wallet && m.hasCommitted && !m.hasRevealed && m.state === MilestoneState.VotingOpen && now < m.commitDeadline && (
             <div className="liquid-glass rounded-xl px-4 py-3 flex items-center gap-2 border border-amber-500/20">
               <CheckCircle2 className="w-4 h-4 text-amber-400" />
               <div>
@@ -609,8 +609,9 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
             </div>
           )}
 
-          {/* INVESTOR: Reveal */}
-          {!isFounder && wallet && m.hasCommitted && !m.hasRevealed && m.state === MilestoneState.RevealOpen && (
+          {/* INVESTOR: Reveal — shown when commit deadline passed (state VotingOpen or RevealOpen) */}
+          {!isFounder && wallet && m.hasCommitted && !m.hasRevealed &&
+            (m.state === MilestoneState.RevealOpen || (m.state === MilestoneState.VotingOpen && now >= m.commitDeadline)) && (
             <div className="space-y-2">
               {savedCommit ? (
                 <>
