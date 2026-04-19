@@ -323,7 +323,8 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
                       if (teamMembers.trim()) form.append("team_members", teamMembers.trim());
                       proofFiles.forEach((f) => form.append("files", f));
 
-                      const res = await fetch("http://127.0.0.1:8000/verify", {
+                      const agentBase = (import.meta.env.VITE_AGENT_URL as string | undefined)?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+                      const res = await fetch(`${agentBase}/verify`, {
                         method: "POST",
                         body: form,
                       });
@@ -342,7 +343,7 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
                       }
                     } catch (err) {
                       setAgentStatus("error");
-                      toast.error("Agent pipeline failed", err instanceof Error ? err.message : "Could not reach the agent server at http://127.0.0.1:8000");
+                      toast.error("Agent pipeline failed", err instanceof Error ? err.message : "Could not reach the agent server. Check VITE_AGENT_URL.");
                     }
                   }}
                   className="w-full flex items-center justify-center gap-2 liquid-glass-strong rounded-full py-2.5 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity"
