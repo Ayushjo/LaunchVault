@@ -49,22 +49,32 @@ const ICONS: Record<ToastType, ReactNode> = {
 };
 
 const BORDER: Record<ToastType, string> = {
-  success: "border-emerald-500/30",
-  error: "border-red-500/30",
-  warning: "border-amber-500/30",
-  info: "border-blue-500/30",
+  success: "border-emerald-500/20",
+  error:   "border-red-500/20",
+  warning: "border-amber-500/20",
+  info:    "border-blue-500/20",
+};
+
+const BAR: Record<ToastType, string> = {
+  success: "bg-emerald-400",
+  error:   "bg-red-400",
+  warning: "bg-amber-400",
+  info:    "bg-blue-400",
 };
 
 function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: () => void }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: 48, filter: "blur(8px)" }}
-      animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-      exit={{ opacity: 0, x: 48, filter: "blur(8px)" }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className={`liquid-glass rounded-xl border ${BORDER[t.type]} px-4 py-3 flex items-start gap-3 min-w-[300px] max-w-sm shadow-[0_8px_32px_rgba(0,0,0,0.4)]`}
+      initial={{ opacity: 0, y: 12, scale: 0.96, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      exit={{ opacity: 0, y: 8, scale: 0.96, filter: "blur(4px)" }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className={`relative rounded-2xl border ${BORDER[t.type]} px-4 py-3.5 flex items-start gap-3 min-w-[320px] max-w-sm overflow-hidden`}
+      style={{ background: "rgba(14,14,16,0.95)", backdropFilter: "blur(20px)", boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.06) inset" }}
     >
+      {/* Left accent bar */}
+      <div className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-full ${BAR[t.type]}`} />
       <div className="mt-0.5 shrink-0">{ICONS[t.type]}</div>
       <div className="flex-1 min-w-0">
         <p className="text-white font-body font-medium text-sm leading-snug">{t.title}</p>

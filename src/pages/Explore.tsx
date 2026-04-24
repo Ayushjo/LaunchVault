@@ -7,26 +7,25 @@ import {
   type CampaignListItem, type CampaignDetails,
 } from "../hooks/useCampaign";
 import { useToast } from "../context/ToastContext";
-import { Search, Loader2, ArrowUpRight, RefreshCw, Users, TrendingUp, Clock, Filter } from "lucide-react";
+import {
+  Search, Loader2, ArrowUpRight, RefreshCw,
+  Users, TrendingUp, Clock,
+} from "lucide-react";
 import PageBackground from "../components/layout/PageBackground";
 import { motion } from "motion/react";
 
-interface CampaignCard {
-  list: CampaignListItem;
-  details: CampaignDetails;
-}
+interface CampaignCard { list: CampaignListItem; details: CampaignDetails; }
 
-// State → { label, text color, bg, border, bar color }
-const STATE_STYLE: Record<number, { text: string; bg: string; border: string; bar: string }> = {
-  0: { text: "text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", bar: "bg-emerald-400/60" },
-  1: { text: "text-blue-400",    bg: "bg-blue-400/10",    border: "border-blue-400/20",    bar: "bg-blue-400/60"    },
-  2: { text: "text-white/50",    bg: "bg-white/5",        border: "border-white/10",       bar: "bg-white/40"       },
-  3: { text: "text-red-400",     bg: "bg-red-400/10",     border: "border-red-400/20",     bar: "bg-red-400/40"     },
+const STATE: Record<number, { label: string; dot: string; text: string; bg: string; border: string }> = {
+  0: { label: "Active",    dot: "bg-emerald-400", text: "text-emerald-400", bg: "bg-emerald-400/8",  border: "border-emerald-400/20" },
+  1: { label: "Funded",    dot: "bg-blue-400",    text: "text-blue-400",    bg: "bg-blue-400/8",     border: "border-blue-400/20"    },
+  2: { label: "Completed", dot: "bg-white/40",    text: "text-white/40",    bg: "bg-white/5",        border: "border-white/10"       },
+  3: { label: "Cancelled", dot: "bg-red-400",     text: "text-red-400",     bg: "bg-red-400/8",      border: "border-red-400/20"     },
 };
 
 function pct(raised: bigint, goal: bigint) {
   if (!goal) return 0;
-  return Math.min(100, Number((raised * BigInt(100)) / goal));
+  return Math.min(100, Number((raised * 100n) / goal));
 }
 
 function timeLeft(ts: bigint): string {
@@ -34,73 +33,125 @@ function timeLeft(ts: bigint): string {
   if (diff <= 0) return "Ended";
   const d = Math.floor(diff / 86400000);
   const h = Math.floor((diff % 86400000) / 3600000);
-  return d > 0 ? `${d}d ${h}h left` : `${h}h ${Math.floor((diff % 3600000) / 60000)}m left`;
+  return d > 0 ? `${d}d left` : `${h}h left`;
+}
+
+// Deterministic gradient from address
+function addrGradient(addr: string) {
+  const h = parseInt(addr.slice(2, 6), 16) % 360;
+  const h2 = (h + 40) % 360;
+  return `linear-gradient(135deg, hsl(${h},70%,45%) 0%, hsl(${h2},60%,35%) 100%)`;
+}
+
+function initials(title: string) {
+  return title.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
+
+function ProgressBar({ value, state }: { value: number; state: number }) {
+  const bar =
+    value >= 100
+      ? "bg-emerald-400"
+      : state === 0
+      ? "bg-gradient-to-r from-violet-500 to-blue-500"
+      : state === 1
+      ? "bg-gradient-to-r from-blue-400 to-cyan-400"
+      : "bg-white/30";
+  return (
+    <div className="h-0.5 w-full bg-white/6 rounded-full overflow-hidden">
+      <div className={`h-full rounded-full transition-all duration-1000 ${bar}`} style={{ width: `${value}%` }} />
+    </div>
+  );
 }
 
 function CampaignCardItem({ item, index }: { item: CampaignCard; index: number }) {
   const { details: d } = item;
   const progress = pct(d.totalRaised, d.goal);
-  const style = STATE_STYLE[d.campaignState] ?? STATE_STYLE[2];
+  const st = STATE[d.campaignState] ?? STATE[2];
+  const grad = addrGradient(d.address);
+  const ms = Number(d.milestoneCount);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ delay: index * 0.055, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
     >
       <Link
         to={`/campaign/${d.address}`}
-        className="group relative liquid-glass rounded-2xl p-5 flex flex-col gap-4 border border-white/[0.04] hover:border-white/[0.1] transition-all duration-300 block"
+        className="group relative flex flex-col gap-5 rounded-2xl p-5 border border-white/6 bg-white/[0.02] card-glow block overflow-hidden"
       >
-        {/* State accent line on left */}
-        <div className={`absolute left-0 top-4 bottom-4 w-0.5 rounded-full ${style.bar} opacity-60`} />
+        {/* Subtle inner top highlight */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 pl-3">
+        {/* Avatar + title */}
+        <div className="flex items-start gap-3.5">
+          <div
+            className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-white text-sm font-heading italic shadow-lg"
+            style={{ background: grad }}
+          >
+            {initials(d.title)}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-[10px] font-body font-medium uppercase tracking-widest px-2 py-0.5 rounded-full border ${style.text} ${style.bg} ${style.border}`}>
+              <div className={`flex items-center gap-1.5 tag ${st.text} ${st.bg} ${st.border}`}>
+                <span className={`w-1 h-1 rounded-full ${st.dot}`} />
                 {campaignStateLabel(d.campaignState)}
-              </span>
+              </div>
             </div>
-            <h3 className="text-white font-heading italic text-xl leading-tight line-clamp-1 group-hover:text-white/80 transition-colors">
+            <h3 className="text-white font-body font-semibold text-[15px] leading-snug line-clamp-1 group-hover:text-white/80 transition-colors">
               {d.title}
             </h3>
-            <p className="text-white/35 font-body text-xs mt-1 line-clamp-2 leading-relaxed">
-              {d.description}
-            </p>
           </div>
-          <ArrowUpRight className="w-4 h-4 text-white/15 group-hover:text-white/50 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0 mt-1" />
+          <ArrowUpRight className="w-3.5 h-3.5 text-white/10 group-hover:text-white/40 transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 shrink-0 mt-0.5" />
         </div>
 
+        {/* Description */}
+        <p className="text-white/35 font-body text-[13px] leading-relaxed line-clamp-2 -mt-1">
+          {d.description}
+        </p>
+
         {/* Progress */}
-        <div className="pl-3">
-          <div className="flex justify-between text-xs font-body text-white/35 mb-1.5">
-            <span>{fmtEth(d.totalRaised, 3)} ETH raised</span>
-            <span className="text-white/55 font-medium">{progress}%</span>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-[12px] font-body">
+            <span className="text-white/40">
+              <span className="text-white/70 font-medium">{fmtEth(d.totalRaised, 3)}</span> ETH raised
+            </span>
+            <span className={`font-semibold tabular-nums ${progress >= 100 ? "text-emerald-400" : "text-white/55"}`}>
+              {progress}%
+            </span>
           </div>
-          <div className="h-1 bg-white/8 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${progress >= 100 ? "bg-emerald-400" : style.bar}`}
-              style={{ width: `${progress}%` }}
-            />
+          <ProgressBar value={progress} state={d.campaignState} />
+          <div className="flex items-center justify-between text-[11px] font-body text-white/25">
+            <span>Goal: {fmtEth(d.goal, 2)} ETH</span>
+            <span className="font-mono">{d.address.slice(0, 6)}…{d.address.slice(-4)}</span>
           </div>
-          <p className="text-white/25 font-body text-xs mt-1">Goal: {fmtEth(d.goal, 2)} ETH</p>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-white/5 pl-3">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-white/35 font-body text-xs">
+        <div className="flex items-center justify-between pt-3 border-t border-white/5">
+          <div className="flex items-center gap-3.5">
+            <span className="flex items-center gap-1.5 text-white/30 text-[12px] font-body">
               <Users className="w-3 h-3" />
-              {d.investorCount.toString()}
+              {d.investorCount.toString()} investor{d.investorCount !== 1n ? "s" : ""}
             </span>
-            <span className="flex items-center gap-1.5 text-white/35 font-body text-xs">
-              <TrendingUp className="w-3 h-3" />
-              {d.milestoneCount.toString()} milestones
-            </span>
+            {/* Milestone dots */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: ms }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    i < Number(d.currentMilestoneIndex)
+                      ? "bg-emerald-400/70"
+                      : i === Number(d.currentMilestoneIndex) && d.campaignState !== CampaignState.Completed
+                      ? "bg-white/50"
+                      : "bg-white/12"
+                  }`}
+                />
+              ))}
+              <span className="text-white/25 text-[11px] font-body ml-1">{ms}ms</span>
+            </div>
           </div>
-          <span className="flex items-center gap-1.5 text-white/25 font-body text-xs">
+          <span className="flex items-center gap-1 text-white/25 text-[12px] font-body">
             <Clock className="w-3 h-3" />
             {timeLeft(d.deadline)}
           </span>
@@ -111,8 +162,7 @@ function CampaignCardItem({ item, index }: { item: CampaignCard; index: number }
 }
 
 type FilterState = "all" | "active" | "funded" | "completed";
-
-const FILTER_LABELS: { key: FilterState; label: string }[] = [
+const FILTERS: { key: FilterState; label: string }[] = [
   { key: "all", label: "All" },
   { key: "active", label: "Active" },
   { key: "funded", label: "Funded" },
@@ -133,10 +183,8 @@ export default function Explore(): JSX.Element {
       const all = await fetchAllCampaigns();
       const enriched = await Promise.all(
         all.map(async (list) => {
-          try {
-            const details = await fetchCampaignDetails(list.address);
-            return { list, details };
-          } catch { return null; }
+          try { const details = await fetchCampaignDetails(list.address); return { list, details }; }
+          catch { return null; }
         })
       );
       setItems(enriched.filter(Boolean) as CampaignCard[]);
@@ -150,14 +198,11 @@ export default function Explore(): JSX.Element {
 
   useEffect(() => { load(); }, []);
 
-  const handleRefresh = () => { setRefreshing(true); load(true); };
-
   const filtered = items.filter((item) => {
-    const matchSearch =
-      !search ||
-      item.details.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.details.description.toLowerCase().includes(search.toLowerCase()) ||
-      item.details.address.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = !q || item.details.title.toLowerCase().includes(q) ||
+      item.details.description.toLowerCase().includes(q) ||
+      item.details.address.toLowerCase().includes(q);
     const matchFilter =
       filter === "all" ||
       (filter === "active" && item.details.campaignState === CampaignState.Active) ||
@@ -167,85 +212,71 @@ export default function Explore(): JSX.Element {
   });
 
   return (
-    <div className="min-h-screen relative overflow-hidden pt-28 pb-24 px-6">
+    <div className="min-h-screen relative overflow-hidden pt-24 pb-28 px-5 md:px-8">
       <PageBackground />
 
       <div className="relative z-10 max-w-6xl mx-auto">
-        {/* ── Header ── */}
-        <div className="flex items-end justify-between mb-12">
+
+        {/* Header */}
+        <div className="flex items-end justify-between mb-10 mt-4">
           <div>
             <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-white/25 font-body text-xs uppercase tracking-[0.2em] mb-3"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="text-white/20 font-body text-[11px] uppercase tracking-[0.18em] mb-3"
             >
-              On-chain campaigns
+              On-chain · {loading ? "—" : items.length} campaigns
             </motion.p>
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="text-5xl md:text-6xl lg:text-7xl font-heading italic text-white tracking-tight leading-[0.85]"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="text-5xl md:text-6xl font-heading italic text-white tracking-tight leading-[0.88]"
             >
               Explore
             </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.15 }}
-              className="text-white/35 font-body font-light text-sm mt-2"
-            >
-              {loading ? "Loading…" : `${items.length} campaign${items.length !== 1 ? "s" : ""} deployed`}
-            </motion.p>
           </div>
           <motion.div
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="flex items-center gap-3"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+            className="flex items-center gap-2"
           >
-            <Link
-              to="/create"
-              className="liquid-glass-strong rounded-full px-5 py-2.5 text-white font-body font-medium text-sm flex items-center gap-1.5 hover:opacity-90 transition-opacity"
-            >
+            <Link to="/create"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-body font-medium text-white bg-white/7 border border-white/10 hover:bg-white/12 transition-colors">
               Launch
               <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing || loading}
-              className="text-white/30 hover:text-white/60 transition-colors disabled:opacity-40"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            <button onClick={() => { setRefreshing(true); load(true); }} disabled={refreshing || loading}
+              className="w-8 h-8 flex items-center justify-center rounded-full border border-white/8 text-white/30 hover:text-white/60 hover:bg-white/5 transition-all disabled:opacity-30">
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
           </motion.div>
         </div>
 
-        {/* ── Search + filter ── */}
+        {/* Search + filter */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="flex flex-col sm:flex-row gap-3 mb-10"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12, duration: 0.4 }}
+          className="flex flex-col sm:flex-row gap-2.5 mb-8"
         >
+          {/* Search */}
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by title, description, or address…"
+              placeholder="Search campaigns…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full liquid-glass rounded-full pl-10 pr-5 py-3 text-sm font-body text-white placeholder-white/20 bg-transparent outline-none focus:ring-1 focus:ring-white/20 transition-all border border-white/[0.04] focus:border-white/10"
+              className="w-full h-9 rounded-full pl-9 pr-4 text-[13px] font-body text-white placeholder-white/20 bg-white/4 border border-white/8 outline-none focus:border-white/18 focus:bg-white/6 transition-all"
             />
           </div>
-          <div className="liquid-glass rounded-full px-1.5 py-1 flex items-center gap-0.5 shrink-0 border border-white/[0.04]">
-            <Filter className="w-3 h-3 text-white/20 ml-2.5 mr-1" />
-            {FILTER_LABELS.map(({ key, label }) => (
+          {/* Filter pills */}
+          <div className="flex items-center gap-1 bg-white/4 border border-white/8 rounded-full px-1.5 py-1">
+            {FILTERS.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-body font-medium transition-all ${
-                  filter === key ? "bg-white text-black" : "text-white/45 hover:text-white"
+                className={`px-3.5 py-1 rounded-full text-[12px] font-body font-medium transition-all duration-150 ${
+                  filter === key
+                    ? "bg-white text-black shadow-sm"
+                    : "text-white/40 hover:text-white"
                 }`}
               >
                 {label}
@@ -254,24 +285,49 @@ export default function Explore(): JSX.Element {
           </div>
         </motion.div>
 
-        {/* ── Grid ── */}
+        {/* Grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-40">
-            <Loader2 className="w-6 h-6 text-white/25 animate-spin" />
+          /* Skeleton cards */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/5 bg-white/[0.02] p-5 space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl shimmer" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-16 rounded-full shimmer" />
+                    <div className="h-4 w-32 rounded-full shimmer" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="h-3 w-full rounded-full shimmer" />
+                  <div className="h-3 w-3/4 rounded-full shimmer" />
+                </div>
+                <div className="h-0.5 w-full rounded-full shimmer" />
+                <div className="flex justify-between">
+                  <div className="h-3 w-20 rounded-full shimmer" />
+                  <div className="h-3 w-12 rounded-full shimmer" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-5 py-40 text-center">
-            <p className="text-white/25 font-body text-sm">
+          <div className="flex flex-col items-center gap-4 py-40 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-white/4 border border-white/8 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-white/20" />
+            </div>
+            <p className="text-white/30 font-body text-[13px]">
               {search || filter !== "all" ? "No campaigns match your filters." : "No campaigns deployed yet."}
             </p>
             {!search && filter === "all" && (
-              <Link to="/create" className="liquid-glass-strong rounded-full px-6 py-3 text-white font-body font-medium text-sm hover:opacity-90 transition-opacity">
+              <Link to="/create"
+                className="mt-2 flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-body font-medium text-white bg-white/7 border border-white/10 hover:bg-white/12 transition-colors">
                 Launch the first campaign
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {filtered.map((item, i) => (
               <CampaignCardItem key={item.details.address} item={item} index={i} />
             ))}

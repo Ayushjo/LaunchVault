@@ -1,37 +1,48 @@
 /**
- * PageBackground — ambient orb layer used on all inner pages
- * (Home manages its own animated version)
+ * PageBackground — ambient orb + grid layer used on all inner pages
  */
 export default function PageBackground() {
   return (
     <div className="fixed inset-0 pointer-events-none z-0" aria-hidden>
-      {/* Top-center purple */}
+      {/* Subtle dot grid */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+          maskImage: "radial-gradient(ellipse 80% 80% at 50% 0%, black 40%, transparent 100%)",
+          WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 0%, black 40%, transparent 100%)",
+        }}
+      />
+
+      {/* Top-center violet core */}
       <div style={{
-        position: "absolute", width: 800, height: 800,
-        top: "-25%", left: "50%", transform: "translateX(-50%)",
-        background: "radial-gradient(circle, rgba(99,60,255,0.13) 0%, transparent 65%)",
-        filter: "blur(70px)",
+        position: "absolute", width: 900, height: 700,
+        top: "-20%", left: "50%", transform: "translateX(-50%)",
+        background: "radial-gradient(ellipse, rgba(109,40,217,0.15) 0%, transparent 65%)",
+        filter: "blur(60px)",
       }} />
+
       {/* Mid-left blue */}
       <div style={{
         position: "absolute", width: 500, height: 500,
-        top: "25%", left: "-8%",
-        background: "radial-gradient(circle, rgba(56,130,255,0.09) 0%, transparent 70%)",
+        top: "20%", left: "-10%",
+        background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)",
         filter: "blur(80px)",
       }} />
+
       {/* Mid-right teal */}
       <div style={{
-        position: "absolute", width: 450, height: 450,
-        top: "50%", right: "-5%",
-        background: "radial-gradient(circle, rgba(0,190,170,0.07) 0%, transparent 70%)",
-        filter: "blur(80px)",
+        position: "absolute", width: 400, height: 400,
+        top: "45%", right: "-8%",
+        background: "radial-gradient(circle, rgba(20,184,166,0.07) 0%, transparent 70%)",
+        filter: "blur(70px)",
       }} />
-      {/* Bottom purple */}
+
+      {/* Bottom gradient to bg color */}
       <div style={{
-        position: "absolute", width: 600, height: 400,
-        bottom: "5%", left: "50%", transform: "translateX(-50%)",
-        background: "radial-gradient(circle, rgba(99,60,255,0.08) 0%, transparent 70%)",
-        filter: "blur(80px)",
+        position: "absolute", bottom: 0, left: 0, right: 0, height: "45%",
+        background: "linear-gradient(to bottom, transparent, #080808)",
       }} />
     </div>
   );
