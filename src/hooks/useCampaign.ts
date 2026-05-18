@@ -10,6 +10,7 @@ import {
   Contract,
   parseEther,
   formatEther,
+  getAddress,
   solidityPackedKeccak256,
   randomBytes,
   hexlify,
@@ -17,11 +18,17 @@ import {
   type Eip1193Provider,
 } from "ethers";
 import {
+  CHAIN_ID,
   FACTORY_ADDRESS,
   CAMPAIGN_V2_ABI,
   FACTORY_V2_ABI,
   TOKEN_V2_ABI,
 } from "../contracts/config";
+
+const LAUNCHVAULT_NETWORK = {
+  chainId: CHAIN_ID,
+  name: "launchvault-testnet",
+};
 
 // ── State constants (const objects instead of enum — erasableSyntaxOnly) ──────
 
@@ -113,7 +120,7 @@ export interface CreateCampaignParams {
 
 function getProvider() {
   if (!window.ethereum) throw new Error("No wallet detected");
-  return new BrowserProvider(window.ethereum as unknown as Eip1193Provider);
+  return new BrowserProvider(window.ethereum as unknown as Eip1193Provider, LAUNCHVAULT_NETWORK);
 }
 
 async function getSigner() {
@@ -121,19 +128,19 @@ async function getSigner() {
 }
 
 function factoryRO() {
-  return new Contract(FACTORY_ADDRESS, FACTORY_V2_ABI, getProvider());
+  return new Contract(getAddress(FACTORY_ADDRESS), FACTORY_V2_ABI, getProvider());
 }
 async function factoryRW() {
-  return new Contract(FACTORY_ADDRESS, FACTORY_V2_ABI, await getSigner());
+  return new Contract(getAddress(FACTORY_ADDRESS), FACTORY_V2_ABI, await getSigner());
 }
 function campaignRO(addr: string) {
-  return new Contract(addr, CAMPAIGN_V2_ABI, getProvider());
+  return new Contract(getAddress(addr), CAMPAIGN_V2_ABI, getProvider());
 }
 async function campaignRW(addr: string) {
-  return new Contract(addr, CAMPAIGN_V2_ABI, await getSigner());
+  return new Contract(getAddress(addr), CAMPAIGN_V2_ABI, await getSigner());
 }
 function tokenRO(addr: string) {
-  return new Contract(addr, TOKEN_V2_ABI, getProvider());
+  return new Contract(getAddress(addr), TOKEN_V2_ABI, getProvider());
 }
 
 // ── Block timestamp (use instead of Date.now() for testnet time travel) ───────

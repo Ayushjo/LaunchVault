@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type JSX } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeft, Users, Clock, Shield, TrendingUp, CheckCircle2,
@@ -39,6 +39,18 @@ function timeLeft(ts: bigint, chainNow: bigint): string {
   const h = Math.floor((diffSec % 86400) / 3600);
   if (d > 0) return `${d}d ${h}h left`;
   return `${h}h ${Math.floor((diffSec % 3600) / 60)}m left`;
+}
+
+function asText(value: unknown): string {
+  return typeof value === "string" ? value : String(value ?? "");
+}
+
+function asArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
 // State → accent colors
@@ -82,7 +94,32 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
   const savedCommit = wallet ? loadCommitRecord(campaign.address, m.index) : null;
   const now = chainNow;
   const isCurrentMilestone = Number(campaign.currentMilestoneIndex) === m.index;
+  const hasOsint = Boolean(agentReport?.osint);
+  const osintReport = asRecord(agentReport?.osint);
+  const txHash = asText(agentReport?.tx_hash);
   const style = MS_STYLE[m.state] ?? MS_STYLE[0];
+  const osintSection: JSX.Element | null = hasOsint ? (
+    <div className="mt-2 border-t border-white/[0.04] pt-2">
+      <button
+        onClick={() => setOsintExpanded((p) => !p)}
+        className="flex items-center gap-1.5 text-white/30 font-body text-xs hover:text-white/50 transition-colors w-full"
+      >
+        {osintExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        <Building2 className="w-3 h-3" />
+        Entity verification · {asText(osintReport.verdict)}
+        <span className={`ml-auto font-mono ${Number(osintReport.score) >= 7000 ? "text-emerald-400/70" : Number(osintReport.score) >= 4000 ? "text-amber-400/70" : "text-red-400/70"}`}>
+          {Math.round(Number(osintReport.score) / 100)}/100
+        </span>
+      </button>
+      {osintExpanded && (
+        <div className="mt-2 space-y-2 pl-2">
+          <p className="text-white/30 font-body text-[10px] leading-relaxed">
+            {asText(osintReport.consistency_assessment)}
+          </p>
+        </div>
+      )}
+    </div>
+  ) : null;
 
   const run = async (label: string, fn: () => Promise<string>) => {
     setBusy(true);
@@ -400,7 +437,7 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
                     <p className="text-white/70 font-body font-medium text-sm">{agentReport.verdict as string}</p>
                     <p className="text-white/30 font-body text-xs truncate mt-0.5">{agentReport.reasoning as string}</p>
                   </div>
-                  {agentReport.on_chain && (
+                  {Boolean(agentReport.on_chain) && (
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   )}
                 </div>
@@ -416,20 +453,20 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
 
                 {reportExpanded && (
                   <div className="space-y-2">
-                    {(agentReport.key_positive_signals as string[])?.length > 0 && (
+                    {asArray(agentReport.key_positive_signals).length > 0 && (
                       <div>
                         <p className="text-white/25 font-body text-[10px] uppercase tracking-widest mb-1">Positive signals</p>
-                        {(agentReport.key_positive_signals as string[]).map((s, i) => (
+                        {asArray(agentReport.key_positive_signals).map((s, i) => (
                           <p key={i} className="text-emerald-400/70 font-body text-xs flex gap-1.5">
                             <span className="shrink-0">+</span>{s}
                           </p>
                         ))}
                       </div>
                     )}
-                    {(agentReport.key_negative_signals as string[])?.length > 0 && (
+                    {asArray(agentReport.key_negative_signals).length > 0 && (
                       <div>
                         <p className="text-white/25 font-body text-[10px] uppercase tracking-widest mb-1 mt-2">Concerns</p>
-                        {(agentReport.key_negative_signals as string[]).map((s, i) => (
+                        {asArray(agentReport.key_negative_signals).map((s, i) => (
                           <p key={i} className="text-red-400/70 font-body text-xs flex gap-1.5">
                             <span className="shrink-0">−</span>{s}
                           </p>
@@ -437,74 +474,11 @@ function MilestoneCard({ m, campaign, wallet, isFounder, isOracle, onAction, cha
                       </div>
                     )}
                     {/* OSINT section */}
-                    {agentReport.osint && (
-                      <div className="mt-2 border-t border-white/[0.04] pt-2">
-                        <button
-                          onClick={() => setOsintExpanded((p) => !p)}
-                          className="flex items-center gap-1.5 text-white/30 font-body text-xs hover:text-white/50 transition-colors w-full"
-                        >
-                          {osintExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                          <Building2 className="w-3 h-3" />
-                          Entity verification · {(agentReport.osint as Record<string, unknown>).verdict as string}
-                          <span className={`ml-auto font-mono ${
-                            ((agentReport.osint as Record<string, unknown>).score as number) >= 7000 ? "text-emerald-400/70"
-                            : ((agentReport.osint as Record<string, unknown>).score as number) >= 4000 ? "text-amber-400/70"
-                            : "text-red-400/70"
-                          }`}>
-                            {Math.round(((agentReport.osint as Record<string, unknown>).score as number) / 100)}/100
-                          </span>
-                        </button>
-                        {osintExpanded && (() => {
-                          const o = agentReport.osint as Record<string, unknown>;
-                          const sigs = (o.signals ?? {}) as Record<string, number>;
-                          const facts = (o.verified_facts ?? []) as string[];
-                          const flags = (o.flags ?? []) as string[];
-                          return (
-                            <div className="mt-2 space-y-2 pl-2">
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                {[
-                                  ["Domain", sigs.domain_intelligence],
-                                  ["Registration", sigs.company_registration],
-                                  ["Web presence", sigs.web_presence],
-                                  ["News", sigs.news_coverage],
-                                  ["Team", sigs.team_verification],
-                                ].map(([label, val]) => val !== undefined && (
-                                  <div key={label as string} className="flex justify-between text-[10px] font-body">
-                                    <span className="text-white/25">{label}</span>
-                                    <span className={`font-mono ${(val as number) >= 7000 ? "text-emerald-400/60" : (val as number) >= 4000 ? "text-amber-400/60" : "text-red-400/60"}`}>
-                                      {Math.round((val as number) / 100)}/100
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                              {o.consistency_assessment && (
-                                <p className="text-white/30 font-body text-[10px] leading-relaxed">{o.consistency_assessment as string}</p>
-                              )}
-                              {facts.length > 0 && (
-                                <div>
-                                  <p className="text-white/20 font-body text-[10px] uppercase tracking-widest mb-1">Verified facts</p>
-                                  {facts.slice(0, 4).map((f, i) => (
-                                    <p key={i} className="text-emerald-400/50 font-body text-[10px] flex gap-1.5"><span className="shrink-0">✓</span>{f}</p>
-                                  ))}
-                                </div>
-                              )}
-                              {flags.length > 0 && (
-                                <div>
-                                  <p className="text-white/20 font-body text-[10px] uppercase tracking-widest mb-1">Flags</p>
-                                  {flags.slice(0, 4).map((f, i) => (
-                                    <p key={i} className="text-red-400/50 font-body text-[10px] flex gap-1.5"><span className="shrink-0">⚑</span>{f}</p>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
+                    {osintSection}
 
-                    {agentReport.tx_hash && (
-                      <p className="text-white/20 font-mono text-[10px] break-all mt-2">TX: {agentReport.tx_hash as string}</p>
-                    )}
+                    {txHash ? (
+                      <p className="text-white/20 font-mono text-[10px] break-all mt-2">TX: {txHash}</p>
+                    ) : null}
                   </div>
                 )}
               </div>

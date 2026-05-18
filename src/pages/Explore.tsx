@@ -8,7 +8,7 @@ import {
 } from "../hooks/useCampaign";
 import { useToast } from "../context/ToastContext";
 import {
-  Search, Loader2, ArrowUpRight, RefreshCw,
+  Search, ArrowUpRight, RefreshCw,
   Users, TrendingUp, Clock,
 } from "lucide-react";
 import PageBackground from "../components/layout/PageBackground";
